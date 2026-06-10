@@ -111,6 +111,7 @@ private:
     // 辅助函数
     QImage mat2QImage(const cv::Mat &mat);
     cv::Mat QImage2Mat(const QImage &image);
+    static cv::Mat imreadSafe(const QString &path); // 安全读取图片（支持中文路径）
     void displayTemplateImage();
     void displayTestImage();
     void displayResultImage();

@@ -224,6 +224,23 @@ cv::Mat MainWindow::QImage2Mat(const QImage &image)
     return mat;
 }
 
+// 安全读取图片 —— 用 QFile 把文件读到内存，再用 cv::imdecode 解码
+// 彻底绕过 OpenCV 在 Windows 上不支持中文路径的问题
+cv::Mat MainWindow::imreadSafe(const QString &path)
+{
+    QFile file(path);
+    if (!file.open(QIODevice::ReadOnly)) {
+        return cv::Mat();
+    }
+    QByteArray data = file.readAll();
+    file.close();
+    if (data.isEmpty()) {
+        return cv::Mat();
+    }
+    std::vector<uchar> buffer(data.begin(), data.end());
+    return cv::imdecode(buffer, cv::IMREAD_COLOR);
+}
+
 // 显示模板图像
 void MainWindow::displayTemplateImage()
 {
@@ -343,9 +360,9 @@ void MainWindow::addResultToTable(const DetectionResult &result)
 // 读取模板图片
 bool MainWindow::loadTemplateImage(const QString &path)
 {
-    m_templateImage = cv::imread(path.toStdString());
+    m_templateImage = imreadSafe(path);
     if (m_templateImage.empty()) {
-        QMessageBox::warning(this, "错误", "无法加载模板图片！");
+        QMessageBox::warning(this, "错误", QString("无法加载模板图片！\n路径：%1\n\n提示：请确认文件格式为 PNG/JPG/BMP/TIF。").arg(path));
         return false;
     }
     
@@ -522,9 +539,9 @@ bool MainWindow::loadConfigFile(const QString &path)
 // 加载待测图片
 bool MainWindow::loadTestImage(const QString &path)
 {
-    m_testImage = cv::imread(path.toStdString());
+    m_testImage = imreadSafe(path);
     if (m_testImage.empty()) {
-        QMessageBox::warning(this, "错误", "无法加载待测图片！");
+        QMessageBox::warning(this, "错误", QString("无法加载待测图片！\n路径：%1").arg(path));
         return false;
     }
     
@@ -678,9 +695,9 @@ void MainWindow::performDetection(const QString &imagePath)
     }
     
     // 加载待测图片
-    cv::Mat testImage = cv::imread(imagePath.toStdString());
+    cv::Mat testImage = imreadSafe(imagePath);
     if (testImage.empty()) {
-        QMessageBox::warning(this, "错误", "无法加载待测图片！");
+        QMessageBox::warning(this, "错误", QString("无法加载待测图片！\n路径：%1").arg(imagePath));
         return;
     }
     
