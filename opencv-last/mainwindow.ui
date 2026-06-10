@@ -6,12 +6,12 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>1200</width>
-    <height>800</height>
+    <width>1400</width>
+    <height>900</height>
    </rect>
   </property>
   <property name="windowTitle">
-   <string>残缺字符检测系统</string>
+   <string>残缺字符检测系统 - Character Defect Detection</string>
   </property>
   <widget class="QWidget" name="centralwidget">
    <layout class="QVBoxLayout" name="verticalLayout">
@@ -22,220 +22,286 @@
       </property>
       <widget class="QWidget" name="tabTemplate">
        <attribute name="title">
-        <string>模板设计</string>
+        <string>  模板设计  </string>
        </attribute>
        <layout class="QVBoxLayout" name="verticalLayout_2">
         <item>
-         <layout class="QHBoxLayout" name="horizontalLayout">
-          <item>
-           <widget class="QPushButton" name="btnLoadTemplate">
-            <property name="text">
-             <string>读取模板图片</string>
-            </property>
-           </widget>
-          </item>
-          <item>
-           <widget class="QPushButton" name="btnAddROI">
-            <property name="text">
-             <string>添加检测区域</string>
-            </property>
-           </widget>
-          </item>
-          <item>
-           <widget class="QPushButton" name="btnDeleteROI">
-            <property name="text">
-             <string>删除选中区域</string>
-            </property>
-           </widget>
-          </item>
-          <item>
-           <widget class="QPushButton" name="btnSaveConfig">
-            <property name="text">
-             <string>保存配置文件</string>
-            </property>
-           </widget>
-          </item>
-          <item>
-           <widget class="QPushButton" name="btnLoadConfig">
-            <property name="text">
-             <string>加载配置文件</string>
-            </property>
-           </widget>
-          </item>
-          <item>
-           <spacer name="horizontalSpacer">
-            <property name="orientation">
-             <enum>Qt::Horizontal</enum>
-            </property>
-            <property name="sizeHint" stdset="0">
-             <size>
-              <width>40</width>
-              <height>20</height>
-             </size>
-            </property>
-           </spacer>
-          </item>
-         </layout>
-        </item>
-        <item>
-         <widget class="QLabel" name="lblTemplateImage">
-          <property name="text">
-           <string>请加载模板图片</string>
+         <widget class="QGroupBox" name="groupBox_operation">
+          <property name="title">
+           <string>操作面板</string>
           </property>
-          <property name="alignment">
-           <set>Qt::AlignCenter</set>
-          </property>
-          <property name="minimumSize">
-           <size>
-            <width>400</width>
-            <height>300</height>
-           </size>
-          </property>
+          <layout class="QHBoxLayout" name="horizontalLayout_ops">
+           <item>
+            <widget class="QPushButton" name="btnLoadTemplate">
+             <property name="text">
+              <string>  读取模板图片  </string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QPushButton" name="btnAddROI">
+             <property name="text">
+              <string>  添加检测区域  </string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QPushButton" name="btnDeleteROI">
+             <property name="property" stdset="0">
+              <string>warningBtn</string>
+             </property>
+             <property name="text">
+              <string>  删除选中区域  </string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QPushButton" name="btnSaveConfig">
+             <property name="property" stdset="0">
+              <string>successBtn</string>
+             </property>
+             <property name="text">
+              <string>  保存配置文件  </string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QPushButton" name="btnLoadConfig">
+             <property name="property" stdset="0">
+              <string>secondaryBtn</string>
+             </property>
+             <property name="text">
+              <string>  加载配置文件  </string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <spacer name="horizontalSpacer">
+             <property name="orientation">
+              <enum>Qt::Horizontal</enum>
+             </property>
+             <property name="sizeHint" stdset="0">
+              <size>
+               <width>40</width>
+               <height>20</height>
+              </size>
+             </property>
+            </spacer>
+           </item>
+          </layout>
          </widget>
         </item>
         <item>
-         <widget class="QLabel" name="lblROIInfo">
-          <property name="text">
-           <string>检测区域列表：无</string>
+         <widget class="QGroupBox" name="groupBox_template">
+          <property name="title">
+           <string>模板图像预览</string>
           </property>
+          <layout class="QVBoxLayout" name="verticalLayout_template">
+           <item>
+            <widget class="QLabel" name="lblTemplateImage">
+             <property name="text">
+              <string>请加载模板图片
+
+（加载后可在图片上拖拽选择检测区域）</string>
+             </property>
+             <property name="alignment">
+              <set>Qt::AlignCenter</set>
+             </property>
+             <property name="minimumSize">
+              <size>
+               <width>0</width>
+               <height>400</height>
+              </size>
+             </property>
+            </widget>
+           </item>
+          </layout>
          </widget>
         </item>
         <item>
-         <widget class="QListWidget" name="listROI">
-          <property name="maximumSize">
-           <size>
-            <width>16777215</width>
-            <height>150</height>
-           </size>
+         <widget class="QGroupBox" name="groupBox_roi">
+          <property name="title">
+           <string>检测区域列表</string>
           </property>
+          <layout class="QVBoxLayout" name="verticalLayout_roi">
+           <item>
+            <widget class="QLabel" name="lblROIInfo">
+             <property name="text">
+              <string>当前共 0 个检测区域</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QListWidget" name="listROI">
+             <property name="maximumSize">
+              <size>
+               <width>16777215</width>
+               <height>150</height>
+              </size>
+             </property>
+            </widget>
+           </item>
+          </layout>
          </widget>
         </item>
        </layout>
       </widget>
       <widget class="QWidget" name="tabDetection">
        <attribute name="title">
-        <string>字符检测</string>
+        <string>  字符检测  </string>
        </attribute>
        <layout class="QVBoxLayout" name="verticalLayout_3">
         <item>
-         <layout class="QHBoxLayout" name="horizontalLayout_2">
-          <item>
-           <widget class="QPushButton" name="btnLoadTestImage">
-            <property name="text">
-             <string>加载待测图片</string>
-            </property>
-           </widget>
-          </item>
-          <item>
-           <widget class="QPushButton" name="btnStartDetection">
-            <property name="text">
-             <string>开始检测</string>
-            </property>
-           </widget>
-          </item>
-          <item>
-           <widget class="QPushButton" name="btnBatchDetection">
-            <property name="text">
-             <string>批量检测</string>
-            </property>
-           </widget>
-          </item>
-          <item>
-           <widget class="QLabel" name="label">
-            <property name="text">
-             <string>配置文件：</string>
-            </property>
-           </widget>
-          </item>
-          <item>
-           <widget class="QLineEdit" name="txtConfigPath">
-            <property name="readOnly">
-             <bool>true</bool>
-            </property>
-           </widget>
-          </item>
-          <item>
-           <widget class="QPushButton" name="btnBrowseConfig">
-            <property name="text">
-             <string>浏览</string>
-            </property>
-           </widget>
-          </item>
-          <item>
-           <spacer name="horizontalSpacer_2">
-            <property name="orientation">
-             <enum>Qt::Horizontal</enum>
-            </property>
-            <property name="sizeHint" stdset="0">
-             <size>
-              <width>40</width>
-              <height>20</height>
-             </size>
-            </property>
-           </spacer>
-          </item>
-         </layout>
+         <widget class="QGroupBox" name="groupBox_config">
+          <property name="title">
+           <string>检测配置</string>
+          </property>
+          <layout class="QHBoxLayout" name="horizontalLayout_config">
+           <item>
+            <widget class="QLabel" name="label">
+             <property name="text">
+              <string>配置文件路径：</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QLineEdit" name="txtConfigPath">
+             <property name="readOnly">
+              <bool>true</bool>
+             </property>
+             <property name="placeholderText">
+              <string>请先加载配置文件...</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QPushButton" name="btnBrowseConfig">
+             <property name="property" stdset="0">
+              <string>secondaryBtn</string>
+             </property>
+             <property name="text">
+              <string>浏览</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QPushButton" name="btnLoadTestImage">
+             <property name="text">
+              <string>  加载待测图片  </string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QPushButton" name="btnStartDetection">
+             <property name="property" stdset="0">
+              <string>successBtn</string>
+             </property>
+             <property name="text">
+              <string>  开始检测  </string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QPushButton" name="btnBatchDetection">
+             <property name="text">
+              <string>  批量检测  </string>
+             </property>
+            </widget>
+           </item>
+          </layout>
+         </widget>
         </item>
         <item>
-         <widget class="QSplitter" name="splitter">
-          <property name="orientation">
-           <enum>Qt::Horizontal</enum>
+         <widget class="QGroupBox" name="groupBox_images">
+          <property name="title">
+           <string>图像对比预览</string>
           </property>
-          <widget class="QLabel" name="lblTestImage">
-           <property name="text">
-            <string>待测图片</string>
-           </property>
-           <property name="alignment">
-            <set>Qt::AlignCenter</set>
-           </property>
-          </widget>
-          <widget class="QLabel" name="lblResultImage">
-           <property name="text">
-            <string>检测结果</string>
-           </property>
-           <property name="alignment">
-            <set>Qt::AlignCenter</set>
-           </property>
-          </widget>
+          <layout class="QHBoxLayout" name="horizontalLayout_images">
+           <item>
+            <widget class="QLabel" name="lblTestImage">
+             <property name="text">
+              <string>待测图片</string>
+             </property>
+             <property name="alignment">
+              <set>Qt::AlignCenter</set>
+             </property>
+             <property name="minimumSize">
+              <size>
+               <width>400</width>
+               <height>500</height>
+              </size>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QLabel" name="lblResultImage">
+             <property name="text">
+              <string>检测结果
+
+（标注残缺区域）</string>
+             </property>
+             <property name="alignment">
+              <set>Qt::AlignCenter</set>
+             </property>
+             <property name="minimumSize">
+              <size>
+               <width>400</width>
+               <height>500</height>
+              </size>
+             </property>
+            </widget>
+           </item>
+          </layout>
          </widget>
         </item>
        </layout>
       </widget>
       <widget class="QWidget" name="tabResults">
        <attribute name="title">
-        <string>检测结果</string>
+        <string>  检测结果  </string>
        </attribute>
        <layout class="QVBoxLayout" name="verticalLayout_4">
         <item>
-         <layout class="QHBoxLayout" name="horizontalLayout_3">
-          <item>
-           <widget class="QPushButton" name="btnExportResults">
-            <property name="text">
-             <string>导出结果</string>
-            </property>
-           </widget>
-          </item>
-          <item>
-           <widget class="QPushButton" name="btnClearResults">
-            <property name="text">
-             <string>清空结果</string>
-            </property>
-           </widget>
-          </item>
-          <item>
-           <spacer name="horizontalSpacer_3">
-            <property name="orientation">
-             <enum>Qt::Horizontal</enum>
-            </property>
-            <property name="sizeHint" stdset="0">
-             <size>
-              <width>40</width>
-              <height>20</height>
-             </size>
-            </property>
-           </spacer>
-          </item>
-         </layout>
+         <widget class="QGroupBox" name="groupBox_results_ops">
+          <property name="title">
+           <string>结果操作</string>
+          </property>
+          <layout class="QHBoxLayout" name="horizontalLayout_3">
+           <item>
+            <widget class="QPushButton" name="btnExportResults">
+             <property name="property" stdset="0">
+              <string>successBtn</string>
+             </property>
+             <property name="text">
+              <string>  导出结果 (CSV)  </string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QPushButton" name="btnClearResults">
+             <property name="property" stdset="0">
+              <string>warningBtn</string>
+             </property>
+             <property name="text">
+              <string>  清空结果  </string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <spacer name="horizontalSpacer_3">
+             <property name="orientation">
+              <enum>Qt::Horizontal</enum>
+             </property>
+             <property name="sizeHint" stdset="0">
+              <size>
+               <width>40</width>
+               <height>20</height>
+              </size>
+             </property>
+            </spacer>
+           </item>
+          </layout>
+         </widget>
         </item>
         <item>
          <widget class="QTableWidget" name="tableResults">
@@ -280,7 +346,7 @@
     <rect>
      <x>0</x>
      <y>0</y>
-     <width>1200</width>
+     <width>1400</width>
      <height>21</height>
     </rect>
    </property>

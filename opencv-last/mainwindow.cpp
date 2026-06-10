@@ -14,15 +14,40 @@ MainWindow::MainWindow(QWidget *parent)
 {
     ui->setupUi(this);
     
+    // 设置按钮属性（用于QSS样式区分）
+    ui->btnDeleteROI->setProperty("warningBtn", true);
+    ui->btnSaveConfig->setProperty("successBtn", true);
+    ui->btnLoadConfig->setProperty("secondaryBtn", true);
+    ui->btnBrowseConfig->setProperty("secondaryBtn", true);
+    ui->btnStartDetection->setProperty("successBtn", true);
+    ui->btnExportResults->setProperty("successBtn", true);
+    ui->btnClearResults->setProperty("warningBtn", true);
+    
+    // 刷新样式
+    ui->btnDeleteROI->style()->unpolish(ui->btnDeleteROI);
+    ui->btnDeleteROI->style()->polish(ui->btnDeleteROI);
+    ui->btnSaveConfig->style()->unpolish(ui->btnSaveConfig);
+    ui->btnSaveConfig->style()->polish(ui->btnSaveConfig);
+    ui->btnLoadConfig->style()->unpolish(ui->btnLoadConfig);
+    ui->btnLoadConfig->style()->polish(ui->btnLoadConfig);
+    ui->btnBrowseConfig->style()->unpolish(ui->btnBrowseConfig);
+    ui->btnBrowseConfig->style()->polish(ui->btnBrowseConfig);
+    ui->btnStartDetection->style()->unpolish(ui->btnStartDetection);
+    ui->btnStartDetection->style()->polish(ui->btnStartDetection);
+    ui->btnExportResults->style()->unpolish(ui->btnExportResults);
+    ui->btnExportResults->style()->polish(ui->btnExportResults);
+    ui->btnClearResults->style()->unpolish(ui->btnClearResults);
+    ui->btnClearResults->style()->polish(ui->btnClearResults);
+    
     // 初始化状态栏
     statusBar()->showMessage("就绪");
     
     // 初始化表格
-    ui->tableResults->setColumnWidth(0, 60);
-    ui->tableResults->setColumnWidth(1, 200);
-    ui->tableResults->setColumnWidth(2, 150);
-    ui->tableResults->setColumnWidth(3, 100);
-    ui->tableResults->setColumnWidth(4, 180);
+    ui->tableResults->setColumnWidth(0, 80);
+    ui->tableResults->setColumnWidth(1, 350);
+    ui->tableResults->setColumnWidth(2, 200);
+    ui->tableResults->setColumnWidth(3, 120);
+    ui->tableResults->setColumnWidth(4, 200);
     
     // 启用鼠标追踪
     setMouseTracking(true);
@@ -160,7 +185,7 @@ void MainWindow::updateROIList()
         ui->listROI->addItem(itemText);
     }
     
-    ui->lblROIInfo->setText(QString("检测区域列表：共 %1 个区域").arg(m_roiList.size()));
+    ui->lblROIInfo->setText(QString("当前共 %1 个检测区域").arg(m_roiList.size()));
 }
 
 // 在模板图像上绘制ROI

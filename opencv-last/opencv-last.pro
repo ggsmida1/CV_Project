@@ -28,6 +28,10 @@ HEADERS += \
 FORMS += \
     mainwindow.ui
 
+# 资源文件
+RESOURCES += \
+    resources.qrc
+
 # OpenCV 配置（使用环境变量）
 OPENCV_DIR = $$(OPENCV_DIR)
 isEmpty(OPENCV_DIR) {
