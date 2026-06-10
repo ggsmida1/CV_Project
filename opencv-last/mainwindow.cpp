@@ -64,12 +64,17 @@ MainWindow::MainWindow(QWidget *parent)
     // 初始化状态栏
     statusBar()->showMessage("就绪");
 
-    // 初始化表格
+    // 初始化表格 - 让最后一列自动拉伸填满剩余空间，避免右侧出现空白
     ui->tableResults->setColumnWidth(0, 80);
-    ui->tableResults->setColumnWidth(1, 350);
     ui->tableResults->setColumnWidth(2, 200);
     ui->tableResults->setColumnWidth(3, 120);
     ui->tableResults->setColumnWidth(4, 200);
+    // 第1列（图片名称）自动拉伸占据剩余空间
+    ui->tableResults->horizontalHeader()->setSectionResizeMode(1, QHeaderView::Stretch);
+    ui->tableResults->horizontalHeader()->setSectionResizeMode(0, QHeaderView::Fixed);
+    ui->tableResults->horizontalHeader()->setSectionResizeMode(2, QHeaderView::Fixed);
+    ui->tableResults->horizontalHeader()->setSectionResizeMode(3, QHeaderView::Fixed);
+    ui->tableResults->horizontalHeader()->setSectionResizeMode(4, QHeaderView::Fixed);
 
     // 启用鼠标追踪
     setMouseTracking(true);
