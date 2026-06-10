@@ -2,12 +2,65 @@
 QMainWindow {
     background-color: #2c3e50;
     color: #ecf0f1;
+    border: 1px solid #f39c12;
 }
 
 QWidget {
     color: #ecf0f1;
     font-family: "Microsoft YaHei", "Segoe UI", sans-serif;
     font-size: 13px;
+}
+
+/* ===== 自定义标题栏 ===== */
+#titleBar {
+    background-color: #1a252f;
+    border-bottom: 2px solid #f39c12;
+    min-height: 38px;
+    max-height: 38px;
+}
+
+#titleBar > QLabel {
+    color: #ecf0f1;
+    padding-left: 10px;
+}
+
+#lblTitleIcon {
+    padding-left: 10px;
+    min-width: 24px;
+    max-width: 24px;
+    min-height: 24px;
+    max-height: 24px;
+}
+
+#lblTitle {
+    color: #f39c12;
+    font-size: 14px;
+    font-weight: bold;
+    padding-left: 4px;
+}
+
+/* 标题栏按钮 - 与titleBar等高，且无额外margin */
+#btnMinimize, #btnMaximize, #btnClose {
+    border: none;
+    background-color: #1a252f;
+    color: #ecf0f1;
+    min-width: 46px;
+    max-width: 46px;
+    min-height: 36px;
+    max-height: 36px;
+    font-size: 14px;
+    padding: 0px;
+    margin: 0px;
+}
+
+#btnMinimize:hover, #btnMaximize:hover {
+    background-color: #34495e;
+    color: #f39c12;
+}
+
+#btnClose:hover {
+    background-color: #e74c3c;
+    color: #ffffff;
 }
 
 /* ===== 标签页样式 ===== */

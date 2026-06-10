@@ -15,6 +15,8 @@
 #include <QFile>
 #include <QMouseEvent>
 #include <QPainter>
+#include <QRect>
+#include <QPoint>
 #include <opencv2/opencv.hpp>
 
 QT_BEGIN_NAMESPACE
@@ -66,22 +68,27 @@ private slots:
     void on_btnExportResults_clicked();
     void on_btnClearResults_clicked();
 
-    // 菜单动作
-    void on_actionOpenTemplate_triggered();
-    void on_actionOpenTestImage_triggered();
-    void on_actionSaveConfig_triggered();
-    void on_actionLoadConfig_triggered();
-    void on_actionExit_triggered();
-    void on_actionAbout_triggered();
+    // 自定义标题栏槽函数
+    void on_btnMinimize_clicked();
+    void on_btnMaximize_clicked();
+    void on_btnClose_clicked();
 
 protected:
-    // 鼠标事件处理（用于ROI选择）
+    // 鼠标事件处理（用于ROI选择和窗口拖动）
     void mousePressEvent(QMouseEvent *event) override;
     void mouseMoveEvent(QMouseEvent *event) override;
     void mouseReleaseEvent(QMouseEvent *event) override;
+    void mouseDoubleClickEvent(QMouseEvent *event) override;
 
 private:
     Ui::MainWindow *ui;
+
+    // 窗口拖动相关变量
+    bool m_isDraggingWindow;
+    QPoint m_dragStartPosition;
+    int m_titleBarHeight;
+    bool m_isMaximized;           // 当前是否最大化（手动追踪，避免FramelessWindowHint下isMaximized失效）
+    QRect m_normalGeometry;       // 还原时用的窗口原始大小
 
     // 模板设计相关变量
     cv::Mat m_templateImage;           // 模板图像

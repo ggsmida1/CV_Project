@@ -3,17 +3,39 @@
 #include <QDebug>
 #include <QDir>
 #include <QTextStream>
+#include <QGuiApplication>
+#include <QScreen>
 #include <cmath>
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
     , ui(new Ui::MainWindow)
+    , m_isDraggingWindow(false)
+    , m_titleBarHeight(38)
+    , m_isMaximized(false)
     , m_currentROIIndex(-1)
     , m_isSelectingROI(false)
     , m_resultCount(0)
 {
+    // 隐藏系统标题栏（无边框），保留最小化/最大化/关闭能力
+    setWindowFlags(Qt::Window | Qt::FramelessWindowHint);
+    // 保留一些默认窗口特性（如可调节大小）
+    setAttribute(Qt::WA_TranslucentBackground, false);
+
     ui->setupUi(this);
-    
+
+    // 标题栏按钮的槽函数（on_btnMinimize_clicked 等）由 setupUi 中的
+    // QMetaObject::connectSlotsByName 自动连接，无需手动 connect。
+    // 如果手动再 connect 一次会导致每个点击触发两次，造成闪一下的假象。
+
+    // 刷新按钮样式
+    ui->btnMinimize->style()->unpolish(ui->btnMinimize);
+    ui->btnMinimize->style()->polish(ui->btnMinimize);
+    ui->btnMaximize->style()->unpolish(ui->btnMaximize);
+    ui->btnMaximize->style()->polish(ui->btnMaximize);
+    ui->btnClose->style()->unpolish(ui->btnClose);
+    ui->btnClose->style()->polish(ui->btnClose);
+
     // 设置按钮属性（用于QSS样式区分）
     ui->btnDeleteROI->setProperty("warningBtn", true);
     ui->btnSaveConfig->setProperty("successBtn", true);
@@ -22,7 +44,7 @@ MainWindow::MainWindow(QWidget *parent)
     ui->btnStartDetection->setProperty("successBtn", true);
     ui->btnExportResults->setProperty("successBtn", true);
     ui->btnClearResults->setProperty("warningBtn", true);
-    
+
     // 刷新样式
     ui->btnDeleteROI->style()->unpolish(ui->btnDeleteROI);
     ui->btnDeleteROI->style()->polish(ui->btnDeleteROI);
@@ -38,19 +60,101 @@ MainWindow::MainWindow(QWidget *parent)
     ui->btnExportResults->style()->polish(ui->btnExportResults);
     ui->btnClearResults->style()->unpolish(ui->btnClearResults);
     ui->btnClearResults->style()->polish(ui->btnClearResults);
-    
+
     // 初始化状态栏
     statusBar()->showMessage("就绪");
-    
+
     // 初始化表格
     ui->tableResults->setColumnWidth(0, 80);
     ui->tableResults->setColumnWidth(1, 350);
     ui->tableResults->setColumnWidth(2, 200);
     ui->tableResults->setColumnWidth(3, 120);
     ui->tableResults->setColumnWidth(4, 200);
-    
+
     // 启用鼠标追踪
     setMouseTracking(true);
+}
+
+// 最小化窗口
+void MainWindow::on_btnMinimize_clicked()
+{
+    showMinimized();
+}
+
+// 最大化/还原窗口
+// FramelessWindowHint + QMainWindow 组合下，setGeometry/resize 经常被布局系统强制还原
+// 解决方案：先解除 minimumSize/maximumSize 限制，再用两种方式双重设置大小
+void MainWindow::on_btnMaximize_clicked()
+{
+    if (m_isMaximized) {
+        // 还原
+        if (m_normalGeometry.isValid() && m_normalGeometry.width() > 100) {
+            setMinimumSize(0, 0);
+            setMaximumSize(16777215, 16777215);
+            move(m_normalGeometry.topLeft());
+            resize(m_normalGeometry.size());
+            setGeometry(m_normalGeometry);
+        } else {
+            move(100, 100);
+            resize(1400, 900);
+            setGeometry(100, 100, 1400, 900);
+        }
+        ui->btnMaximize->setText("▢");
+        m_isMaximized = false;
+    } else {
+        // 最大化
+        m_normalGeometry = QRect(pos(), size());
+
+        // 拿到屏幕大小
+        int w = 1920;
+        int h = 1040;
+        QScreen *screen = QGuiApplication::screenAt(QCursor::pos());
+        if (!screen) {
+            screen = QGuiApplication::primaryScreen();
+        }
+        if (screen) {
+            QRect r = screen->availableGeometry();
+            w = r.width();
+            h = r.height();
+        }
+
+        // 关键：先解除最小/最大尺寸限制，否则 resize 被布局系统强制还原
+        setMinimumSize(0, 0);
+        setMaximumSize(16777215, 16777215);
+
+        // 两种方式设置大小，互相兜底
+        move(0, 0);
+        resize(w, h);
+        setGeometry(0, 0, w, h);
+
+        ui->btnMaximize->setText("❐");
+        m_isMaximized = true;
+    }
+
+    // 强制刷新布局
+    if (centralWidget()) {
+        centralWidget()->setMinimumSize(0, 0);
+        centralWidget()->setMaximumSize(16777215, 16777215);
+        centralWidget()->updateGeometry();
+    }
+    update();
+    repaint();
+}
+
+// 关闭窗口
+void MainWindow::on_btnClose_clicked()
+{
+    close();
+}
+
+// 双击标题栏 - 切换最大化
+void MainWindow::mouseDoubleClickEvent(QMouseEvent *event)
+{
+    if (event->button() == Qt::LeftButton && event->pos().y() <= m_titleBarHeight) {
+        on_btnMaximize_clicked();
+        return;
+    }
+    QMainWindow::mouseDoubleClickEvent(event);
 }
 
 MainWindow::~MainWindow()
@@ -794,54 +898,26 @@ void MainWindow::on_btnClearResults_clicked()
     statusBar()->showMessage("结果已清空");
 }
 
-// 菜单动作
-void MainWindow::on_actionOpenTemplate_triggered()
-{
-    on_btnLoadTemplate_clicked();
-}
-
-void MainWindow::on_actionOpenTestImage_triggered()
-{
-    on_btnLoadTestImage_clicked();
-}
-
-void MainWindow::on_actionSaveConfig_triggered()
-{
-    on_btnSaveConfig_clicked();
-}
-
-void MainWindow::on_actionLoadConfig_triggered()
-{
-    on_btnLoadConfig_clicked();
-}
-
-void MainWindow::on_actionExit_triggered()
-{
-    close();
-}
-
-void MainWindow::on_actionAbout_triggered()
-{
-    QMessageBox::about(this, "关于", 
-        "残缺字符检测系统 v1.0\n\n"
-        "功能说明：\n"
-        "1. 模板设计：加载模板图片，设置检测区域，保存配置\n"
-        "2. 字符检测：加载待测图片，自动进行倾斜矫正、模板匹配、残缺检测\n"
-        "3. 结果导出：检测结果可导出为CSV文件\n\n"
-        "开发者：计算机视觉课程大作业");
-}
-
 // ==================== 鼠标事件处理 ====================
 
 void MainWindow::mousePressEvent(QMouseEvent *event)
 {
+    // 检查是否点击在标题栏区域（用于拖动窗口）
+    if (event->button() == Qt::LeftButton && event->pos().y() <= m_titleBarHeight) {
+        // 点击在标题栏 - 准备拖动窗口
+        m_isDraggingWindow = true;
+        m_dragStartPosition = event->globalPos() - frameGeometry().topLeft();
+        event->accept();
+        return;
+    }
+
+    // ROI选择逻辑
     if (m_isSelectingROI && event->button() == Qt::LeftButton) {
-        // 检查是否点击在模板图像显示区域
         QLabel *lblTemplate = ui->lblTemplateImage;
         QPoint globalPos = event->globalPos();
         QPoint labelPos = lblTemplate->mapFromGlobal(globalPos);
-        
-        if (labelPos.x() >= 0 && labelPos.y() >= 0 && 
+
+        if (labelPos.x() >= 0 && labelPos.y() >= 0 &&
             labelPos.x() < lblTemplate->width() && labelPos.y() < lblTemplate->height()) {
             m_roiStartPoint = labelPos;
             m_roiEndPoint = labelPos;
@@ -852,24 +928,34 @@ void MainWindow::mousePressEvent(QMouseEvent *event)
 
 void MainWindow::mouseMoveEvent(QMouseEvent *event)
 {
+    // 窗口拖动逻辑
+    if (m_isDraggingWindow && (event->buttons() & Qt::LeftButton)) {
+        if (!isMaximized()) {
+            move(event->globalPos() - m_dragStartPosition);
+        }
+        event->accept();
+        return;
+    }
+
+    // ROI选择逻辑
     if (m_isSelectingROI && !m_roiStartPoint.isNull()) {
         QLabel *lblTemplate = ui->lblTemplateImage;
         QPoint globalPos = event->globalPos();
         QPoint labelPos = lblTemplate->mapFromGlobal(globalPos);
-        
+
         // 限制在标签范围内
         labelPos.setX(qBound(0, labelPos.x(), lblTemplate->width()));
         labelPos.setY(qBound(0, labelPos.y(), lblTemplate->height()));
-        
+
         m_roiEndPoint = labelPos;
-        
+
         // 绘制选择框
         if (!m_templateDisplay.empty()) {
             // 计算缩放比例
             QSize labelSize = lblTemplate->size();
             double scale = qMin(static_cast<double>(labelSize.width()) / m_templateImage.cols,
                                 static_cast<double>(labelSize.height()) / m_templateImage.rows);
-            
+
             // 在显示图像上绘制选择框
             cv::Mat display = m_templateDisplay.clone();
             cv::Rect scaledRect(
@@ -879,7 +965,7 @@ void MainWindow::mouseMoveEvent(QMouseEvent *event)
                 static_cast<int>(abs(m_roiEndPoint.y() - m_roiStartPoint.y()) / scale)
             );
             cv::rectangle(display, scaledRect, cv::Scalar(255, 255, 0), 2);
-            
+
             // 缩放显示
             cv::Mat resized;
             cv::resize(display, resized, cv::Size(), scale, scale, cv::INTER_AREA);
@@ -892,23 +978,31 @@ void MainWindow::mouseMoveEvent(QMouseEvent *event)
 
 void MainWindow::mouseReleaseEvent(QMouseEvent *event)
 {
+    // 结束窗口拖动
+    if (event->button() == Qt::LeftButton && m_isDraggingWindow) {
+        m_isDraggingWindow = false;
+        event->accept();
+        return;
+    }
+
+    // ROI选择逻辑
     if (m_isSelectingROI && event->button() == Qt::LeftButton && !m_roiStartPoint.isNull()) {
         m_isSelectingROI = false;
-        
+
         // 计算实际的ROI坐标
         QLabel *lblTemplate = ui->lblTemplateImage;
         QSize labelSize = lblTemplate->size();
         double scale = qMin(static_cast<double>(labelSize.width()) / m_templateImage.cols,
                             static_cast<double>(labelSize.height()) / m_templateImage.rows);
-        
+
         int x1 = static_cast<int>(qMin(m_roiStartPoint.x(), m_roiEndPoint.x()) / scale);
         int y1 = static_cast<int>(qMin(m_roiStartPoint.y(), m_roiEndPoint.y()) / scale);
         int x2 = static_cast<int>(qMax(m_roiStartPoint.x(), m_roiEndPoint.x()) / scale);
         int y2 = static_cast<int>(qMax(m_roiStartPoint.y(), m_roiEndPoint.y()) / scale);
-        
+
         cv::Rect rect(x1, y1, x2 - x1, y2 - y1);
         addROI(rect);
-        
+
         m_roiStartPoint = QPoint();
         m_roiEndPoint = QPoint();
     }
