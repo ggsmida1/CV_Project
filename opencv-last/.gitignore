@@ -1,0 +1,57 @@
+# Qt Creator 用户配置（每个开发者不同）
+*.pro.user
+*.pro.user.*
+
+# qmake 生成的文件
+.qmake.stash
+Makefile
+Makefile.*
+*.Debug
+*.Release
+
+# 构建输出目录
+bin/
+build/
+debug/
+release/
+
+# 编译中间文件
+*.o
+*.obj
+moc_*.cpp
+moc_*.h
+qrc_*.cpp
+ui_*.h
+*.res
+
+# Qt 相关
+*.qm
+*.ts.qm
+
+# 可执行文件
+*.exe
+
+# 库文件（如果项目生成）
+*.dll
+*.lib
+*.a
+*.so
+*.dylib
+
+# IDE 和编辑器
+.vscode/
+.idea/
+*.suo
+*.sln
+*.vcxproj*
+
+# 操作系统文件
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# 临时文件
+*~
+*.swp
+*.bak
+*.log
