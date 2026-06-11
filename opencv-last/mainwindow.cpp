@@ -517,7 +517,13 @@ bool MainWindow::saveConfigFile(const QString &path)
     }
     
     QJsonObject root;
-    root["templatePath"] = m_templateImagePath;
+
+    // 将模板路径存为相对路径（相对于 samples 目录），便于跨机器共享
+    // 例如：templates/template.png
+    QFileInfo templateInfo(m_templateImagePath);
+    QString relativePath = "templates/" + templateInfo.fileName();
+    root["templatePath"] = relativePath;
+
     root["templateWidth"] = m_templateImage.cols;
     root["templateHeight"] = m_templateImage.rows;
     
@@ -575,17 +581,25 @@ bool MainWindow::loadConfigFile(const QString &path)
     }
     
     QJsonObject root = doc.object();
-    
-    // 加载模板图片
-    QString templatePath = root["templatePath"].toString();
-    if (!loadTemplateImage(templatePath)) {
-        // 尝试使用相对路径
-        QFileInfo configInfo(path);
-        QString absoluteTemplatePath = configInfo.absolutePath() + "/" + QFileInfo(templatePath).fileName();
-        if (!loadTemplateImage(absoluteTemplatePath)) {
-            QMessageBox::warning(this, "错误", "无法加载模板图片，请确保图片路径正确！");
-            return false;
-        }
+
+    // 加载模板图片（路径是相对于 samples 目录的相对路径）
+    QString templateRelativePath = root["templatePath"].toString();
+
+    // 从可执行文件所在目录往上定位项目根目录
+    QDir appDir(QCoreApplication::applicationDirPath());
+    QString projectRoot = appDir.absolutePath();
+    if (!QDir(projectRoot + "/samples").exists()) {
+        appDir.cdUp();
+        projectRoot = appDir.absolutePath();
+    }
+
+    QString templateAbsolutePath = projectRoot + "/samples/" + templateRelativePath;
+
+    if (!loadTemplateImage(templateAbsolutePath)) {
+        QMessageBox::warning(this, "错误",
+            QString("无法加载模板图片！\n路径：%1\n\n提示：请确认 templates 目录下存在该图片。")
+            .arg(templateAbsolutePath));
+        return false;
     }
     
     // 加载ROI列表
@@ -907,7 +921,17 @@ void MainWindow::performDetection(const QString &imagePath)
 // 模板设计模块槽函数
 void MainWindow::on_btnLoadTemplate_clicked()
 {
-    QString path = QFileDialog::getOpenFileName(this, "选择模板图片", "", 
+    // 从可执行文件所在目录往上定位 samples 目录
+    QDir appDir(QCoreApplication::applicationDirPath());
+    QString projectRoot = appDir.absolutePath();
+    if (!QDir(projectRoot + "/samples/templates").exists()) {
+        appDir.cdUp();
+        projectRoot = appDir.absolutePath();
+    }
+    QString defaultDir = projectRoot + "/samples/templates";
+
+    QString path = QFileDialog::getOpenFileName(this, "选择模板图片",
+                                                 defaultDir,
                                                  "图片文件 (*.png *.jpg *.jpeg *.bmp *.tif)");
     if (!path.isEmpty()) {
         loadTemplateImage(path);
@@ -936,7 +960,31 @@ void MainWindow::on_btnDeleteROI_clicked()
 
 void MainWindow::on_btnSaveConfig_clicked()
 {
-    QString path = QFileDialog::getSaveFileName(this, "保存配置文件", "", 
+    // 定位 samples/configs/ 目录（从 exe 目录往上找项目根）
+    QDir appDir(QCoreApplication::applicationDirPath());
+    QString projectRoot = appDir.absolutePath();
+    if (!QDir(projectRoot + "/samples/configs").exists()) {
+        appDir.cdUp();
+        projectRoot = appDir.absolutePath();
+    }
+    QString defaultDir = projectRoot + "/samples/configs";
+
+    // 确保 configs 目录存在
+    QDir().mkpath(defaultDir);
+
+    // 文件名使用模板图片名
+    QString defaultName;
+    if (!m_templateImagePath.isEmpty()) {
+        QFileInfo templateInfo(m_templateImagePath);
+        defaultName = templateInfo.completeBaseName() + ".json";
+    } else {
+        defaultName = "config.json";
+    }
+
+    QString defaultPath = defaultDir + "/" + defaultName;
+
+    QString path = QFileDialog::getSaveFileName(this, "保存配置文件",
+                                                 defaultPath,
                                                  "JSON文件 (*.json)");
     if (!path.isEmpty()) {
         if (!path.endsWith(".json")) {
@@ -948,7 +996,16 @@ void MainWindow::on_btnSaveConfig_clicked()
 
 void MainWindow::on_btnLoadConfig_clicked()
 {
-    QString path = QFileDialog::getOpenFileName(this, "选择配置文件", "", 
+    QDir appDir(QCoreApplication::applicationDirPath());
+    QString projectRoot = appDir.absolutePath();
+    if (!QDir(projectRoot + "/samples/configs").exists()) {
+        appDir.cdUp();
+        projectRoot = appDir.absolutePath();
+    }
+    QString defaultDir = projectRoot + "/samples/configs";
+
+    QString path = QFileDialog::getOpenFileName(this, "选择配置文件",
+                                                 defaultDir,
                                                  "JSON文件 (*.json)");
     if (!path.isEmpty()) {
         loadConfigFile(path);
@@ -964,7 +1021,16 @@ void MainWindow::on_listROI_currentRowChanged(int currentRow)
 // 检测模块槽函数
 void MainWindow::on_btnLoadTestImage_clicked()
 {
-    QString path = QFileDialog::getOpenFileName(this, "选择待测图片", "", 
+    QDir appDir(QCoreApplication::applicationDirPath());
+    QString projectRoot = appDir.absolutePath();
+    if (!QDir(projectRoot + "/samples/test_images").exists()) {
+        appDir.cdUp();
+        projectRoot = appDir.absolutePath();
+    }
+    QString defaultDir = projectRoot + "/samples/test_images";
+
+    QString path = QFileDialog::getOpenFileName(this, "选择待测图片",
+                                                 defaultDir,
                                                  "图片文件 (*.png *.jpg *.jpeg *.bmp *.tif)");
     if (!path.isEmpty()) {
         loadTestImage(path);
@@ -973,7 +1039,16 @@ void MainWindow::on_btnLoadTestImage_clicked()
 
 void MainWindow::on_btnBrowseConfig_clicked()
 {
-    QString path = QFileDialog::getOpenFileName(this, "选择配置文件", "", 
+    QDir appDir(QCoreApplication::applicationDirPath());
+    QString projectRoot = appDir.absolutePath();
+    if (!QDir(projectRoot + "/samples/configs").exists()) {
+        appDir.cdUp();
+        projectRoot = appDir.absolutePath();
+    }
+    QString defaultDir = projectRoot + "/samples/configs";
+
+    QString path = QFileDialog::getOpenFileName(this, "选择配置文件",
+                                                 defaultDir,
                                                  "JSON文件 (*.json)");
     if (!path.isEmpty()) {
         loadConfigFile(path);
@@ -1000,9 +1075,18 @@ void MainWindow::on_btnBatchDetection_clicked()
         QMessageBox::warning(this, "提示", "请先加载配置文件！");
         return;
     }
+
+    QDir appDir(QCoreApplication::applicationDirPath());
+    QString projectRoot = appDir.absolutePath();
+    if (!QDir(projectRoot + "/samples/test_images").exists()) {
+        appDir.cdUp();
+        projectRoot = appDir.absolutePath();
+    }
+    QString defaultDir = projectRoot + "/samples/test_images";
     
-    QStringList paths = QFileDialog::getOpenFileNames(this, "选择待测图片", "", 
-                                                       "图片文件 (*.png *.jpg *.jpeg *.bmp *.tif)");
+    QStringList paths = QFileDialog::getOpenFileNames(this, "选择待测图片",
+                                                      defaultDir,
+                                                      "图片文件 (*.png *.jpg *.jpeg *.bmp *.tif)");
     if (paths.isEmpty()) {
         return;
     }
