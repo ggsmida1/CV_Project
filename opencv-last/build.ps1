@@ -43,6 +43,7 @@ $ExeName        = "CharacterDefectDetection.exe"
 $ProjectDir     = $PSScriptRoot
 $BuildDir       = "$ProjectDir\build"
 $BinDir         = "$ProjectDir\bin"
+$OrigDir        = (Get-Location).Path   # remember caller's directory so we can restore it
 
 # ---------- Validate paths ----------
 function Test-DirExists([string]$path, [string]$name) {
@@ -98,29 +99,37 @@ if (-not (Test-Path "$BuildDir\Makefile")) {
     }
 }
 if ($needQmake) {
-    Set-Location $BuildDir
-    if (Test-Path "Makefile") {
-        Remove-Item "Makefile" -Force
-    }
-    $proc = Start-Process -FilePath "qmake" -ArgumentList "..\$ProFile" -Wait -PassThru -NoNewWindow
-    if ($proc.ExitCode -ne 0) {
-        Write-Host "qmake failed (exit=$($proc.ExitCode))" -ForegroundColor Red
-        exit 1
-    }
-    if (-not (Test-Path "Makefile")) {
-        Write-Host "qmake reported success but Makefile not found in build\" -ForegroundColor Red
-        exit 1
+    Push-Location $BuildDir
+    try {
+        if (Test-Path "Makefile") {
+            Remove-Item "Makefile" -Force
+        }
+        $proc = Start-Process -FilePath "qmake" -ArgumentList "..\$ProFile" -Wait -PassThru -NoNewWindow
+        if ($proc.ExitCode -ne 0) {
+            Write-Host "qmake failed (exit=$($proc.ExitCode))" -ForegroundColor Red
+            exit 1
+        }
+        if (-not (Test-Path "Makefile")) {
+            Write-Host "qmake reported success but Makefile not found in build\" -ForegroundColor Red
+            exit 1
+        }
+    } finally {
+        Pop-Location
     }
 }
 Write-Host "  OK" -ForegroundColor Green
 
 # ---------- Step 2: Incremental compile (no clean - let make decide) ----------
 Write-Host "[2/4] Compiling (mingw32-make in build\)..." -ForegroundColor Yellow
-Set-Location $BuildDir
-$proc = Start-Process -FilePath "mingw32-make" -Wait -PassThru -NoNewWindow
-if ($proc.ExitCode -ne 0) {
-    Write-Host "Build failed (exit=$($proc.ExitCode))" -ForegroundColor Red
-    exit 1
+Push-Location $BuildDir
+try {
+    $proc = Start-Process -FilePath "mingw32-make" -Wait -PassThru -NoNewWindow
+    if ($proc.ExitCode -ne 0) {
+        Write-Host "Build failed (exit=$($proc.ExitCode))" -ForegroundColor Red
+        exit 1
+    }
+} finally {
+    Pop-Location
 }
 Write-Host "  OK" -ForegroundColor Green
 
@@ -170,6 +179,9 @@ if ((Test-Path $platformsSrc) -and -not (Test-Path $platformsDst)) {
 Write-Host "  Copied $copied new item(s)" -ForegroundColor Green
 
 # ---------- Done ----------
+# restore working directory so the user's shell doesn't end up in build\
+Set-Location $OrigDir
+
 $exePath = "$BinDir\$ExeName"
 if (-not (Test-Path $exePath)) {
     Write-Host ""
