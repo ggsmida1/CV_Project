@@ -16,6 +16,7 @@
 #include <QApplication>
 #include <QTextOption>
 #include <QPushButton>
+#include <QtMath>
 
 static void refreshStyle(QPushButton *btn)
 {
@@ -93,6 +94,25 @@ MainWindow::MainWindow(QWidget *parent)
     ui->lblTemplateImage->setScaledContents(false);
     ui->lblTestImage->setScaledContents(false);
     ui->lblResultImage->setScaledContents(false);
+
+    // 标题栏小星星
+    QPixmap starPix(24, 24);
+    starPix.fill(Qt::transparent);
+    {
+        QPainter p(&starPix);
+        p.setRenderHint(QPainter::Antialiasing);
+        QPolygonF star;
+        for (int i = 0; i < 10; ++i) {
+            double r = (i % 2 == 0) ? 10.0 : 4.5;
+            double a = -90.0 + i * 36.0;
+            star << QPointF(12.0 + r * qCos(qDegreesToRadians(a)),
+                            12.0 + r * qSin(qDegreesToRadians(a)));
+        }
+        p.setPen(Qt::NoPen);
+        p.setBrush(QColor("#f39c12"));
+        p.drawPolygon(star);
+    }
+    ui->lblTitleIcon->setPixmap(starPix);
 }
 
 MainWindow::~MainWindow()
