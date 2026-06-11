@@ -119,6 +119,13 @@ private:
     void drawROIsOnTemplate();
     void addResultToTable(const DetectionResult &result);
 
+    // 坐标映射：把 QLabel 控件坐标 -> 图像像素坐标（考虑缩放+居中偏移）
+    // 返回 (-1,-1) 表示点击不在图像区域
+    QPoint labelToImagePos(QLabel *label, const cv::Mat &image, const QPoint &labelPos);
+    // 计算图像在 label 内的缩放比和偏移 (用于显示和坐标转换)
+    void computeImageTransform(QLabel *label, const cv::Mat &image,
+                               double &outScale, int &outOffsetX, int &outOffsetY);
+
     // 模板设计模块函数
     bool loadTemplateImage(const QString &path);
     void addROI(const cv::Rect &rect);

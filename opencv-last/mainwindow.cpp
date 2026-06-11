@@ -78,6 +78,12 @@ MainWindow::MainWindow(QWidget *parent)
 
     // 启用鼠标追踪
     setMouseTracking(true);
+
+    // 关闭 scaledContents：确保 pixmap 以原始比例居中显示（而不是拉伸填满label）
+    // 否则宽高比被破坏 + 鼠标坐标无法正确映射到图像像素
+    ui->lblTemplateImage->setScaledContents(false);
+    ui->lblTestImage->setScaledContents(false);
+    ui->lblResultImage->setScaledContents(false);
 }
 
 // 最小化窗口
@@ -239,6 +245,43 @@ cv::Mat MainWindow::imreadSafe(const QString &path)
     }
     std::vector<uchar> buffer(data.begin(), data.end());
     return cv::imdecode(buffer, cv::IMREAD_COLOR);
+}
+
+// 计算图像在 label 里的缩放比和偏移（图像按比例居中显示）
+void MainWindow::computeImageTransform(QLabel *label, const cv::Mat &image,
+                                       double &outScale, int &outOffsetX, int &outOffsetY)
+{
+    if (!label || image.empty()) {
+        outScale = 1.0;
+        outOffsetX = 0;
+        outOffsetY = 0;
+        return;
+    }
+    QSize labelSize = label->size();
+    double scale = qMin(static_cast<double>(labelSize.width()) / image.cols,
+                        static_cast<double>(labelSize.height()) / image.rows);
+    int displayW = static_cast<int>(image.cols * scale);
+    int displayH = static_cast<int>(image.rows * scale);
+    outScale = scale;
+    outOffsetX = (labelSize.width() - displayW) / 2;    // 图像在label里的x偏移
+    outOffsetY = (labelSize.height() - displayH) / 2;   // 图像在label里的y偏移
+}
+
+// label 控件坐标 -> 图像像素坐标；返回 (-1,-1) 表示点不在图像区域
+QPoint MainWindow::labelToImagePos(QLabel *label, const cv::Mat &image, const QPoint &labelPos)
+{
+    double scale = 1.0;
+    int offsetX = 0, offsetY = 0;
+    computeImageTransform(label, image, scale, offsetX, offsetY);
+
+    // 减去图像在label内的偏移，再除以缩放比，得到图像像素坐标
+    double imgX = (labelPos.x() - offsetX) / scale;
+    double imgY = (labelPos.y() - offsetY) / scale;
+
+    if (imgX < 0 || imgY < 0 || imgX >= image.cols || imgY >= image.rows) {
+        return QPoint(-1, -1);
+    }
+    return QPoint(static_cast<int>(imgX), static_cast<int>(imgY));
 }
 
 // 显示模板图像
@@ -926,23 +969,20 @@ void MainWindow::mousePressEvent(QMouseEvent *event)
 {
     // 检查是否点击在标题栏区域（用于拖动窗口）
     if (event->button() == Qt::LeftButton && event->pos().y() <= m_titleBarHeight) {
-        // 点击在标题栏 - 准备拖动窗口
         m_isDraggingWindow = true;
         m_dragStartPosition = event->globalPos() - frameGeometry().topLeft();
         event->accept();
         return;
     }
 
-    // ROI选择逻辑
+    // ROI选择逻辑 - 把label坐标先转换为图像像素坐标（考虑居中偏移+缩放）
     if (m_isSelectingROI && event->button() == Qt::LeftButton) {
         QLabel *lblTemplate = ui->lblTemplateImage;
-        QPoint globalPos = event->globalPos();
-        QPoint labelPos = lblTemplate->mapFromGlobal(globalPos);
-
-        if (labelPos.x() >= 0 && labelPos.y() >= 0 &&
-            labelPos.x() < lblTemplate->width() && labelPos.y() < lblTemplate->height()) {
-            m_roiStartPoint = labelPos;
-            m_roiEndPoint = labelPos;
+        QPoint labelPos = lblTemplate->mapFromGlobal(event->globalPos());
+        QPoint imgPos = labelToImagePos(lblTemplate, m_templateDisplay, labelPos);
+        if (imgPos.x() >= 0) {
+            m_roiStartPoint = imgPos;   // 存储为图像像素坐标
+            m_roiEndPoint = imgPos;
         }
     }
     QMainWindow::mousePressEvent(event);
@@ -959,41 +999,32 @@ void MainWindow::mouseMoveEvent(QMouseEvent *event)
         return;
     }
 
-    // ROI选择逻辑
-    if (m_isSelectingROI && !m_roiStartPoint.isNull()) {
+    // ROI选择逻辑 - 实时绘制选择框（坐标是图像像素坐标）
+    if (m_isSelectingROI && !m_roiStartPoint.isNull() && !m_templateDisplay.empty()) {
         QLabel *lblTemplate = ui->lblTemplateImage;
-        QPoint globalPos = event->globalPos();
-        QPoint labelPos = lblTemplate->mapFromGlobal(globalPos);
-
-        // 限制在标签范围内
-        labelPos.setX(qBound(0, labelPos.x(), lblTemplate->width()));
-        labelPos.setY(qBound(0, labelPos.y(), lblTemplate->height()));
-
-        m_roiEndPoint = labelPos;
-
-        // 绘制选择框
-        if (!m_templateDisplay.empty()) {
-            // 计算缩放比例
-            QSize labelSize = lblTemplate->size();
-            double scale = qMin(static_cast<double>(labelSize.width()) / m_templateImage.cols,
-                                static_cast<double>(labelSize.height()) / m_templateImage.rows);
-
-            // 在显示图像上绘制选择框
-            cv::Mat display = m_templateDisplay.clone();
-            cv::Rect scaledRect(
-                static_cast<int>(qMin(m_roiStartPoint.x(), m_roiEndPoint.x()) / scale),
-                static_cast<int>(qMin(m_roiStartPoint.y(), m_roiEndPoint.y()) / scale),
-                static_cast<int>(abs(m_roiEndPoint.x() - m_roiStartPoint.x()) / scale),
-                static_cast<int>(abs(m_roiEndPoint.y() - m_roiStartPoint.y()) / scale)
-            );
-            cv::rectangle(display, scaledRect, cv::Scalar(255, 255, 0), 2);
-
-            // 缩放显示
-            cv::Mat resized;
-            cv::resize(display, resized, cv::Size(), scale, scale, cv::INTER_AREA);
-            QImage qImg = mat2QImage(resized);
-            lblTemplate->setPixmap(QPixmap::fromImage(qImg));
+        QPoint labelPos = lblTemplate->mapFromGlobal(event->globalPos());
+        QPoint imgPos = labelToImagePos(lblTemplate, m_templateDisplay, labelPos);
+        if (imgPos.x() >= 0) {
+            m_roiEndPoint = imgPos;
         }
+
+        // 在原图上画ROI框（已存成图像像素坐标，直接画即可）
+        cv::Mat display = m_templateDisplay.clone();
+        int x1 = qMin(m_roiStartPoint.x(), m_roiEndPoint.x());
+        int y1 = qMin(m_roiStartPoint.y(), m_roiEndPoint.y());
+        int x2 = qMax(m_roiStartPoint.x(), m_roiEndPoint.x());
+        int y2 = qMax(m_roiStartPoint.y(), m_roiEndPoint.y());
+        cv::rectangle(display, cv::Point(x1, y1), cv::Point(x2, y2),
+                      cv::Scalar(0, 0, 255), 2);
+
+        // 按比例缩放到label大小后显示
+        double scale = 1.0;
+        int offX = 0, offY = 0;
+        computeImageTransform(lblTemplate, m_templateDisplay, scale, offX, offY);
+        cv::Mat resized;
+        cv::resize(display, resized, cv::Size(), scale, scale, cv::INTER_AREA);
+        QImage qImg = mat2QImage(resized);
+        lblTemplate->setPixmap(QPixmap::fromImage(qImg));
     }
     QMainWindow::mouseMoveEvent(event);
 }
@@ -1007,23 +1038,18 @@ void MainWindow::mouseReleaseEvent(QMouseEvent *event)
         return;
     }
 
-    // ROI选择逻辑
+    // ROI选择逻辑 - 坐标已是图像像素坐标，直接用
     if (m_isSelectingROI && event->button() == Qt::LeftButton && !m_roiStartPoint.isNull()) {
         m_isSelectingROI = false;
 
-        // 计算实际的ROI坐标
-        QLabel *lblTemplate = ui->lblTemplateImage;
-        QSize labelSize = lblTemplate->size();
-        double scale = qMin(static_cast<double>(labelSize.width()) / m_templateImage.cols,
-                            static_cast<double>(labelSize.height()) / m_templateImage.rows);
-
-        int x1 = static_cast<int>(qMin(m_roiStartPoint.x(), m_roiEndPoint.x()) / scale);
-        int y1 = static_cast<int>(qMin(m_roiStartPoint.y(), m_roiEndPoint.y()) / scale);
-        int x2 = static_cast<int>(qMax(m_roiStartPoint.x(), m_roiEndPoint.x()) / scale);
-        int y2 = static_cast<int>(qMax(m_roiStartPoint.y(), m_roiEndPoint.y()) / scale);
-
-        cv::Rect rect(x1, y1, x2 - x1, y2 - y1);
-        addROI(rect);
+        int x1 = qMin(m_roiStartPoint.x(), m_roiEndPoint.x());
+        int y1 = qMin(m_roiStartPoint.y(), m_roiEndPoint.y());
+        int x2 = qMax(m_roiStartPoint.x(), m_roiEndPoint.x());
+        int y2 = qMax(m_roiStartPoint.y(), m_roiEndPoint.y());
+        if (x2 > x1 && y2 > y1) {
+            cv::Rect rect(x1, y1, x2 - x1, y2 - y1);
+            addROI(rect);
+        }
 
         m_roiStartPoint = QPoint();
         m_roiEndPoint = QPoint();
