@@ -617,50 +617,53 @@ bool MainWindow::detectSkewAndCorrect(cv::Mat &image)
     } else {
         gray = image.clone();
     }
-    
+
     // 二值化
     cv::Mat binary;
     cv::threshold(gray, binary, 0, 255, cv::THRESH_BINARY_INV | cv::THRESH_OTSU);
-    
-    // 使用霍夫变换检测直线
+
+    // 使用霍夫变换检测直线（更严格的参数，避免虚假倾斜）
     std::vector<cv::Vec4i> lines;
-    cv::HoughLinesP(binary, lines, 1, CV_PI / 180, 100, 100, 10);
-    
+    int minLineLength = std::max(150, image.cols / 8);  // 线至少占图宽的1/8
+    cv::HoughLinesP(binary, lines, 1, CV_PI / 180, 200, minLineLength, 20);
+
     if (lines.empty()) {
         return false;  // 未检测到倾斜
     }
-    
-    // 计算平均角度
+
+    // 计算平均角度（只考虑接近水平的线，且多条线角度要一致）
     double angle = 0;
     int count = 0;
+    std::vector<double> angles;
     for (const auto &line : lines) {
         double dx = line[2] - line[0];
         double dy = line[3] - line[1];
         double lineAngle = atan2(dy, dx) * 180 / CV_PI;
-        
+
         // 只考虑接近水平的线（倾斜角度小于45度）
         if (fabs(lineAngle) < 45) {
+            angles.push_back(lineAngle);
             angle += lineAngle;
             count++;
         }
     }
-    
-    if (count == 0) {
+
+    if (count < 3) {  // 至少检测到3条线才认为是真实倾斜
         return false;
     }
-    
+
     angle /= count;
-    
-    // 如果倾斜角度很小，不需要矫正
-    if (fabs(angle) < 0.5) {
+
+    // 只有倾斜角度 >=3 度才矫正（避免拍摄抖动导致的虚假旋转）
+    if (fabs(angle) < 3.0) {
         return false;
     }
-    
+
     // 旋转矫正
     cv::Point2f center(image.cols / 2.0, image.rows / 2.0);
     cv::Mat rotMat = cv::getRotationMatrix2D(center, angle, 1.0);
     cv::warpAffine(image, image, rotMat, image.size(), cv::INTER_LINEAR, cv::BORDER_CONSTANT, cv::Scalar(255, 255, 255));
-    
+
     return true;
 }
 
@@ -686,60 +689,57 @@ cv::Rect MainWindow::calculateDetectionRegion(const cv::Point &matchPoint, const
                     templateROI.height);
 }
 
-// 字符残缺检测
+// 字符残缺检测（用 NCC 归一化互相关，对亮度/对比度/轻微位移鲁棒）
 bool MainWindow::detectCharacterDefect(const cv::Mat &testRegion, const cv::Mat &templateRegion, double &defectScore)
 {
     if (testRegion.empty() || templateRegion.empty()) {
         defectScore = 1.0;
-        return true;  // 视为残缺
+        return true;
     }
-    
-    // 确保尺寸一致
-    cv::Mat testResized;
-    if (testRegion.size() != templateRegion.size()) {
-        cv::resize(testRegion, testResized, templateRegion.size());
-    } else {
-        testResized = testRegion.clone();
-    }
-    
-    // 转换为灰度图
+
+    // 转灰度图
     cv::Mat testGray, templateGray;
-    if (testResized.channels() == 3) {
-        cv::cvtColor(testResized, testGray, cv::COLOR_BGR2GRAY);
+    if (testRegion.channels() == 3) {
+        cv::cvtColor(testRegion, testGray, cv::COLOR_BGR2GRAY);
     } else {
-        testGray = testResized;
+        testGray = testRegion.clone();
     }
     if (templateRegion.channels() == 3) {
         cv::cvtColor(templateRegion, templateGray, cv::COLOR_BGR2GRAY);
     } else {
-        templateGray = templateRegion;
+        templateGray = templateRegion.clone();
     }
-    
-    // 高斯模糊去噪
-    cv::GaussianBlur(testGray, testGray, cv::Size(3, 3), 0);
+
+    // 确保尺寸一致（只有当差异明显时才resize，正常情况不需要）
+    cv::Mat testResized;
+    if (testGray.size() != templateGray.size()) {
+        cv::resize(testGray, testResized, templateGray.size());
+    } else {
+        testResized = testGray;
+    }
+
+    // 轻度高斯模糊去噪（消除JPEG压缩噪声，但保留笔画结构）
+    cv::GaussianBlur(testResized, testResized, cv::Size(3, 3), 0);
     cv::GaussianBlur(templateGray, templateGray, cv::Size(3, 3), 0);
-    
-    // 二值化
-    cv::Mat testBinary, templateBinary;
-    cv::threshold(testGray, testBinary, 0, 255, cv::THRESH_BINARY | cv::THRESH_OTSU);
-    cv::threshold(templateGray, templateBinary, 0, 255, cv::THRESH_BINARY | cv::THRESH_OTSU);
-    
-    // 计算差异
-    cv::Mat diff;
-    cv::absdiff(testBinary, templateBinary, diff);
-    
-    // 形态学操作，去除噪声
-    cv::Mat kernel = cv::getStructuringElement(cv::MORPH_RECT, cv::Size(3, 3));
-    cv::morphologyEx(diff, diff, cv::MORPH_OPEN, kernel);
-    
-    // 计算差异比例
-    int totalPixels = diff.rows * diff.cols;
-    int diffPixels = cv::countNonZero(diff);
-    defectScore = static_cast<double>(diffPixels) / totalPixels;
-    
-    // 设定阈值，超过阈值视为残缺
-    double threshold = 0.05;  // 5%差异阈值
-    return defectScore > threshold;
+
+    // 用归一化互相关 (NCC / TM_CCOEFF_NORMED) 做相似度比较
+    // 分数范围 [-1, 1]，1 表示完全相同，0 表示不相关，-1 表示反相关
+    // NCC 对亮度变化、对比度变化鲁棒，不像OTSU+absdiff对轻微位移极度敏感
+    cv::Mat nccResult;
+    cv::matchTemplate(testResized, templateGray, nccResult, cv::TM_CCOEFF_NORMED);
+    double minVal, maxVal;
+    cv::Point minLoc, maxLoc;
+    cv::minMaxLoc(nccResult, &minVal, &maxVal, &minLoc, &maxLoc);
+
+    // 残缺程度 = 1 - NCC分数，范围 [0, 2]
+    //   完全相同的图 → maxVal ≈ 1.0 → score ≈ 0
+    //   笔画有缺失   → maxVal ≈ 0.6~0.85 → score ≈ 0.15~0.4
+    //   完全不同的图 → maxVal ≈ 0 → score ≈ 1
+    defectScore = 1.0 - maxVal;
+
+    // 阈值：NCC < 0.85 判残缺
+    // （同一张图、轻微压缩噪声时 NCC 通常 > 0.95；真实残缺会低于 0.85）
+    return defectScore > 0.15;
 }
 
 // 执行检测
@@ -749,60 +749,113 @@ void MainWindow::performDetection(const QString &imagePath)
         QMessageBox::warning(this, "提示", "请先加载配置文件或设置检测区域！");
         return;
     }
-    
+
     // 加载待测图片
     cv::Mat testImage = imreadSafe(imagePath);
     if (testImage.empty()) {
         QMessageBox::warning(this, "错误", QString("无法加载待测图片！\n路径：%1").arg(imagePath));
         return;
     }
-    
-    // 倾斜矫正
+
+    // 倾斜矫正（仅当检测到明显倾斜时才矫正）
     detectSkewAndCorrect(testImage);
-    
+
     // 复制用于显示结果
     m_resultImage = testImage.clone();
-    
-    // 模板匹配定位（使用整个模板图像）
+
+    // 模板匹配粗略定位（用整个模板图在待测图中搜索）
     cv::Point matchPoint = templateMatch(testImage, m_templateImage);
-    
+
     // 在结果图像上标记匹配位置
-    cv::rectangle(m_resultImage, matchPoint, 
+    cv::rectangle(m_resultImage, matchPoint,
                   cv::Point(matchPoint.x + m_templateImage.cols, matchPoint.y + m_templateImage.rows),
                   cv::Scalar(255, 0, 0), 2);
-    
+
     // 对每个ROI进行检测
     QFileInfo fileInfo(imagePath);
     QString imageName = fileInfo.fileName();
     QString detectionTime = QDateTime::currentDateTime().toString("yyyy-MM-dd hh:mm:ss");
-    
+
     for (const ROIRect &roi : m_roiList) {
-        // 计算待测图像中的检测区域
-        cv::Rect testROI = calculateDetectionRegion(matchPoint, roi.rect);
-        
-        // 确保区域在图像范围内
+        // 粗略位置：matchPoint + roi.rect
+        cv::Point roughCenter(matchPoint.x + roi.rect.x + roi.rect.width / 2,
+                              matchPoint.y + roi.rect.y + roi.rect.height / 2);
+
+        // --- ROI 级精对齐：在粗略位置附近 ±N 像素内做小范围模板匹配 ---
+        // 搜索范围：粗略位置中心 ± halfSearch 的正方形区域
+        int halfSearch = std::min(30, std::min(roi.rect.width, roi.rect.height) / 3);
+
+        // 提取搜索区域（待测图上的一块更大的区域）
+        cv::Rect searchRect(
+            std::max(0, roughCenter.x - roi.rect.width / 2 - halfSearch),
+            std::max(0, roughCenter.y - roi.rect.height / 2 - halfSearch),
+            roi.rect.width + 2 * halfSearch,
+            roi.rect.height + 2 * halfSearch
+        );
+        // 确保不越界
+        searchRect = searchRect & cv::Rect(0, 0, testImage.cols, testImage.rows);
+
+        // 在搜索区域内匹配 roi.templateImage
+        cv::Mat testSearch = testImage(searchRect);
+        cv::Mat roiSearch;
+        if (roi.templateImage.channels() == 3) {
+            roiSearch = roi.templateImage.clone();
+        } else {
+            roiSearch = roi.templateImage.clone();
+        }
+
+        cv::Point preciseOffset(0, 0);
+        if (searchRect.width >= roi.rect.width && searchRect.height >= roi.rect.height) {
+            cv::Mat nccResult;
+            cv::matchTemplate(testSearch, roiSearch, nccResult, cv::TM_CCOEFF_NORMED);
+            double minVal, maxVal;
+            cv::Point minLoc, maxLoc;
+            cv::minMaxLoc(nccResult, &minVal, &maxVal, &minLoc, &maxLoc);
+            preciseOffset = maxLoc;  // roi.templateImage 在 searchRect 内的最佳匹配位置
+        }
+
+        // 精对齐后的 ROI
+        cv::Rect testROI(
+            searchRect.x + preciseOffset.x,
+            searchRect.y + preciseOffset.y,
+            roi.rect.width,
+            roi.rect.height
+        );
         testROI = testROI & cv::Rect(0, 0, testImage.cols, testImage.rows);
-        
+
+        if (testROI.width != roi.rect.width || testROI.height != roi.rect.height) {
+            // 越界了，退回到粗略位置
+            testROI = cv::Rect(
+                std::max(0, matchPoint.x + roi.rect.x),
+                std::max(0, matchPoint.y + roi.rect.y),
+                roi.rect.width,
+                roi.rect.height
+            );
+            testROI = testROI & cv::Rect(0, 0, testImage.cols, testImage.rows);
+        }
+
         if (testROI.area() <= 0) {
             continue;
         }
-        
+
         // 提取检测区域
         cv::Mat testRegion = testImage(testROI);
-        
+
         // 进行残缺检测
         double defectScore;
         bool isDefective = detectCharacterDefect(testRegion, roi.templateImage, defectScore);
-        
+
         // 在结果图像上标记
         cv::Scalar color = isDefective ? cv::Scalar(0, 0, 255) : cv::Scalar(0, 255, 0);
         cv::rectangle(m_resultImage, testROI, color, 2);
-        
-        QString label = isDefective ? QString("Defect: %1%").arg(defectScore * 100, 0, 'f', 1) : "OK";
-        cv::putText(m_resultImage, label.toStdString(), 
+
+        QString label = isDefective
+            ? QString("Defect: %1%").arg(defectScore * 100, 0, 'f', 1)
+            : QString("OK (%1%)").arg((1.0 - defectScore) * 100, 0, 'f', 1);
+        cv::putText(m_resultImage, label.toStdString(),
                     cv::Point(testROI.x, testROI.y - 5),
                     cv::FONT_HERSHEY_SIMPLEX, 0.5, color, 1);
-        
+
         // 记录结果
         DetectionResult result;
         result.id = ++m_resultCount;
@@ -811,11 +864,11 @@ void MainWindow::performDetection(const QString &imagePath)
         result.isDefective = isDefective;
         result.defectScore = defectScore;
         result.detectionTime = detectionTime;
-        
+
         m_resultList.append(result);
         addResultToTable(result);
     }
-    
+
     displayResultImage();
     statusBar()->showMessage(QString("检测完成: %1").arg(imageName));
 }
