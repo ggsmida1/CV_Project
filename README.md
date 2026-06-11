@@ -19,12 +19,18 @@
 
 - 单张图片检测
 - 批量图片检测
-- 自动倾斜矫正（Canny + HoughLinesP + 中位数角度，返回矫正角度值）
+- 自动倾斜矫正（Canny + HoughLinesP + 中位数角度，返回矫正角度值 `double`）
 - 模板匹配定位（归一化互相关 NCC，粗定位 + ROI 级精对齐）
 - 字符残缺检测（NCC 相似度比对，对亮度/对比度鲁棒）
 - 实时显示检测结果（绿色=正常，红色=残缺，标注缺陷百分比）
+- 检测标签页底部图文摘要（区域名 → 正常/残缺 + 百分比）
 
-### 3. 结果管理模块
+### 3. UI 细节
+
+- 自定义 frameless 标题栏（-，▢，✕ 窗口按钮 + 金色 QPainter 绘制五角星图标）
+- ROI 拖拽选择使用 QPainter 叠加矩形框（避免每帧 clone + resize 图像）
+
+### 4. 结果管理模块
 
 - **图片级**检测结果表格展示（一张图片=一条记录，跨 ROI 合并序号/图片名/检测时间）
 - CSV 格式导出（默认路径 `samples/results/`，默认文件名带时间戳）
@@ -135,7 +141,7 @@ opencv-last/
 ### 模板匹配定位
 
 - 使用 `cv::matchTemplate` 进行归一化相关系数匹配（NCC）
-- 先整图粗定位，再对每个 ROI 做 ±30px 局部精匹配对齐
+- 整图粗定位 → ROI 周边精匹配对齐（搜索范围 = min(30, roi宽/3, roi高/3)）
 
 ### 残缺检测
 
@@ -149,16 +155,22 @@ opencv-last/
 
 ```
 opencv-last/
-├── main.cpp              # 程序入口（UTF-8 源码，MinGW UTF-8 编译标志）
-├── mainwindow.h          # 主窗口头文件（仅 UI 声明）
-├── mainwindow.cpp        # 主窗口实现（模板设计/字符检测/检测结果三个标签页，~600 行）
+├── include/              # 头文件
+│   ├── mainwindow.h      # 主窗口头文件（仅 UI 声明）
+│   ├── types.h           # 公共数据结构（ROIRect、DetectionResult）
+│   ├── imageutil.h       # 图像工具函数（Mat↔QImage、坐标映射、label显示）
+│   ├── detector.h        # 检测算法（倾斜校正、模板匹配、残缺检测）
+│   ├── configmanager.h   # 配置文件管理（JSON 保存/加载）
+│   └── resultmanager.h   # 结果管理（表格展示、CSV导出）
+├── src/                  # 源文件
+│   ├── main.cpp          # 程序入口（MinGW UTF-8 编译标志）
+│   ├── mainwindow.cpp    # 主窗口实现（模板设计/字符检测/检测结果，~600 行）
+│   ├── imageutil.cpp     # 图像工具实现（imreadSafe 中文路径读取等）
+│   ├── detector.cpp      # 检测算法实现（Canny+Hough skew correction、NCC 残缺检测）
+│   ├── configmanager.cpp # 配置文件管理实现（模板图片 base64 嵌入 JSON）
+│   └── resultmanager.cpp # 结果管理实现（跨 ROI 合并、CSV 导出）
 ├── mainwindow.ui         # UI界面文件
-├── types.h               # 公共数据结构（ROIRect、DetectionResult）
-├── imageutil.h/.cpp      # 图像工具函数（Mat↔QImage 互转、中文路径读取、坐标映射、label显示）
-├── detector.h/.cpp       # 检测算法模块（倾斜校正、模板匹配、ROI对齐、残缺检测）
-├── configmanager.h/.cpp  # 配置文件管理（JSON 保存/加载）
-├── resultmanager.h/.cpp  # 结果管理（表格展示、CSV导出、清空）
-├── resources.qrc         # Qt 资源文件（含样式）
+├── resources.qrc         # Qt 资源文件（引用 style.qss）
 ├── style.qss             # 界面样式（深色工业风 + 对话框浅色主题）
 ├── opencv-last.pro       # Qt项目配置文件（C++17，MinGW UTF-8 编译标志）
 ├── build.ps1             # 一键构建脚本（编译前自动关闭同名进程）
