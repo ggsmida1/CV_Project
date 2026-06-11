@@ -22,21 +22,23 @@ UI_DIR = $$PWD/build/ui
 
 # 源文件
 SOURCES += \
-    main.cpp \
-    mainwindow.cpp \
-    imageutil.cpp \
-    detector.cpp \
-    configmanager.cpp \
-    resultmanager.cpp
+    src/main.cpp \
+    src/mainwindow.cpp \
+    src/imageutil.cpp \
+    src/detector.cpp \
+    src/configmanager.cpp \
+    src/resultmanager.cpp
 
 # 头文件
 HEADERS += \
-    mainwindow.h \
-    types.h \
-    imageutil.h \
-    detector.h \
-    configmanager.h \
-    resultmanager.h
+    include/mainwindow.h \
+    include/types.h \
+    include/imageutil.h \
+    include/detector.h \
+    include/configmanager.h \
+    include/resultmanager.h
+
+INCLUDEPATH += include
 
 # UI文件
 FORMS += \
