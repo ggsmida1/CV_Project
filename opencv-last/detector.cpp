@@ -80,7 +80,7 @@ cv::Mat alignROI(const cv::Mat &testImage, const cv::Mat &roiTemplate,
     cv::Point roughCenter(roughMatchPoint.x + roiRect.x + roiRect.width / 2,
                           roughMatchPoint.y + roiRect.y + roiRect.height / 2);
 
-    int halfSearch = std::min(30, std::min(roiRect.width, roiRect.height) / 3);
+    int halfSearch = std::min({30, roiRect.width / 3, roiRect.height / 3});
 
     cv::Rect searchRect(
         std::max(0, roughCenter.x - roiRect.width / 2 - halfSearch),
@@ -130,17 +130,12 @@ bool detectCharacterDefect(const cv::Mat &testRegion, const cv::Mat &templateReg
         return true;
     }
 
-    cv::Mat testGray, templateGray;
-    if (testRegion.channels() == 3) {
-        cv::cvtColor(testRegion, testGray, cv::COLOR_BGR2GRAY);
-    } else {
-        testGray = testRegion.clone();
-    }
-    if (templateRegion.channels() == 3) {
-        cv::cvtColor(templateRegion, templateGray, cv::COLOR_BGR2GRAY);
-    } else {
-        templateGray = templateRegion.clone();
-    }
+    auto toGray = [](const cv::Mat &m) -> cv::Mat {
+        if (m.channels() == 3) { cv::Mat g; cv::cvtColor(m, g, cv::COLOR_BGR2GRAY); return g; }
+        return m.clone();
+    };
+    cv::Mat testGray = toGray(testRegion);
+    cv::Mat templateGray = toGray(templateRegion);
 
     cv::Mat testResized;
     if (testGray.size() != templateGray.size()) {

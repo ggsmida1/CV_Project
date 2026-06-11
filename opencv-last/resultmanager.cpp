@@ -40,7 +40,7 @@ void addToTable(QTableWidget *table, int imageId, const QList<DetectionResult> &
         table->setItem(startRow + i, 2, roiItem);
 
         QTableWidgetItem *resultItem = new QTableWidgetItem(
-            r.isDefective ? QString::fromUtf8(u8"残缺") : QString::fromUtf8(u8"正常"));
+            r.isDefective ? QStringLiteral("残缺") : QStringLiteral("正常"));
         resultItem->setTextAlignment(Qt::AlignCenter);
         resultItem->setData(Qt::UserRole, r.isDefective ? 1 : 0);
         table->setItem(startRow + i, 3, resultItem);
@@ -54,7 +54,7 @@ bool exportToCsv(const QString &path, const QList<DetectionResult> &resultList)
 
     QTextStream out(&file);
     out.setCodec("UTF-8");
-    out << QString::fromUtf8(u8"序号,图片名称,检测区域,检测结果,残缺程度,检测时间\n");
+    out << QStringLiteral("序号,图片名称,检测区域,检测结果,残缺程度,检测时间\n");
 
     QMap<QString, int> imageIdMap;
     int nextImageId = 0;
@@ -67,7 +67,7 @@ bool exportToCsv(const QString &path, const QList<DetectionResult> &resultList)
         out << imageId << ","
             << result.imageName << ","
             << result.roiName << ","
-            << (result.isDefective ? QString::fromUtf8(u8"残缺") : QString::fromUtf8(u8"正常")) << ","
+            << (result.isDefective ? QStringLiteral("残缺") : QStringLiteral("正常")) << ","
             << QString::number(result.defectScore * 100, 'f', 2) << "%,"
             << result.detectionTime << "\n";
     }
