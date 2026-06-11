@@ -158,6 +158,9 @@ opencv-last/
 ├── opencv-last.pro       # Qt项目配置文件
 ├── build.ps1             # 一键构建脚本（首次使用需编辑路径）
 ├── .gitignore            # Git忽略配置
+├── samples/              # 测试数据（可提交到仓库）
+│   ├── templates/        # 模板图片（带字符的标准图）
+│   └── test_images/      # 待测图片（用于检测残缺）
 ├── build/                # 编译中间产物（不提交）
 └── bin/                  # 可执行程序 + 依赖DLL（不提交）
 ```
