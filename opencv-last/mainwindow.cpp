@@ -342,6 +342,9 @@ void MainWindow::displayResultImage()
 // 更新ROI列表
 void MainWindow::updateROIList()
 {
+    // 记住当前选中行（删除后尝试保持选择）
+    int currentRow = ui->listROI->currentRow();
+    ui->listROI->blockSignals(true);  // 暂时屏蔽信号，避免 clear 触发 currentRowChanged
     ui->listROI->clear();
     for (int i = 0; i < m_roiList.size(); ++i) {
         QString itemText = QString("ROI %1: (%2,%3) %4x%5 - %6")
@@ -353,7 +356,17 @@ void MainWindow::updateROIList()
             .arg(m_roiList[i].name);
         ui->listROI->addItem(itemText);
     }
-    
+    ui->listROI->blockSignals(false);
+
+    // 重建后尝试选中合理的行
+    if (m_roiList.size() > 0) {
+        int selectRow = qBound(0, currentRow, m_roiList.size() - 1);
+        ui->listROI->setCurrentRow(selectRow);
+        m_currentROIIndex = selectRow;
+    } else {
+        m_currentROIIndex = -1;
+    }
+
     ui->lblROIInfo->setText(QString("当前共 %1 个检测区域").arg(m_roiList.size()));
 }
 
