@@ -63,12 +63,17 @@ OPENCV_DIR = D:/your/opencv/install/path
 ```powershell
 cd opencv-last
 # 打开 build.ps1，修改顶部 CONFIG 区的 5 个路径为你本地 Qt / MinGW / OpenCV 路径
+
+# 增量编译（默认，秒级完成，除非源文件有改动）
 .\build.ps1
+
+# 全量重新编译（遇到奇怪问题时用，会先删 build\ 和 bin\）
+.\build.ps1 --clean     # 或 .\build.ps1 -c
 ```
 
 脚本会自动：
-1. 调用 `qmake` 生成 Makefile（中间产物在 `build/`）
-2. 调用 `mingw32-make` 编译
+1. 调用 `qmake` 生成 Makefile（检测 `.pro` 是否变动，决定是否重跑）
+2. 调用 `mingw32-make` **增量编译**（只重新编译改动过的 `.cpp`）
 3. 把 Qt / OpenCV 运行所需 DLL 和 `platforms/` 插件复制到 `bin/`
 4. 启动程序
 
@@ -82,6 +87,11 @@ opencv-last/
     ├── libopencv_world4100.dll
     └── platforms/qwindows.dll
 ```
+
+**什么时候用 `--clean`**：
+- 修改了 `opencv-last.pro`（添加/删除源文件、改编译选项）
+- 编译出奇怪错误怀疑中间产物过期
+- 想确认从干净环境开始的构建是否正常
 
 #### 方式 B：使用 Qt Creator
 

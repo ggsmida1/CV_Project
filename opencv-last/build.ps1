@@ -3,7 +3,8 @@
 #
 # Usage (PowerShell):
 #   cd opencv-last
-#   .\build.ps1
+#   .\build.ps1              # incremental build (fast when code unchanged)
+#   .\build.ps1 --clean      # clean build: delete build\ and bin\ first
 #
 # BEFORE FIRST RUN: Edit the 5 paths below to match your machine.
 # Qt and OpenCV must be installed (MinGW version, not MSVC).
@@ -28,6 +29,14 @@ $OpenCvBinDir   = "E:\software-e\opencv-4.10.0\build_mingw\install\x64\mingw\bin
 # OpenCV root (same as OPENCV_DIR; must contain include\ and x64\mingw\lib\)
 $OpenCvRoot     = "E:\software-e\opencv-4.10.0\build_mingw\install"
 # ============================================================
+
+# ---------- Parse arguments ----------
+$cleanBuild = $false
+foreach ($arg in $args) {
+    if ($arg -eq "--clean" -or $arg -eq "-c") {
+        $cleanBuild = $true
+    }
+}
 
 $ProFile        = "opencv-last.pro"
 $ExeName        = "CharacterDefectDetection.exe"
@@ -62,31 +71,52 @@ Write-Host "  Character Defect Detection - Build Script"    -ForegroundColor Cya
 Write-Host "==============================================" -ForegroundColor Cyan
 Write-Host ""
 
-# ---------- Step 1: qmake in build\ ----------
-Write-Host "[1/4] Generating Makefile (qmake in build\)..." -ForegroundColor Yellow
+# ---------- Clean build if requested ----------
+if ($cleanBuild) {
+    Write-Host "[pre] --clean: removing build\ and bin\ ..." -ForegroundColor Yellow
+    if (Test-Path $BuildDir) { Remove-Item $BuildDir -Recurse -Force }
+    if (Test-Path $BinDir)   { Remove-Item $BinDir   -Recurse -Force }
+    Write-Host "  OK" -ForegroundColor Green
+    Write-Host ""
+}
+
+# ---------- Step 1: qmake in build\ (only if Makefile missing or .pro changed) ----------
+Write-Host "[1/4] Checking Makefile (qmake in build\)..." -ForegroundColor Yellow
 New-Item -ItemType Directory -Path $BuildDir -Force | Out-Null
+$proTime = (Get-Item "$ProjectDir\$ProFile").LastWriteTimeUtc
+$needQmake = $false
+if (-not (Test-Path "$BuildDir\Makefile")) {
+    $needQmake = $true
+    Write-Host "  Makefile not found, running qmake..."
+} else {
+    $makeTime = (Get-Item "$BuildDir\Makefile").LastWriteTimeUtc
+    if ($proTime -gt $makeTime) {
+        $needQmake = $true
+        Write-Host "  $ProFile changed, re-running qmake..."
+    } else {
+        Write-Host "  Makefile up-to-date, skip qmake"
+    }
+}
+if ($needQmake) {
+    Set-Location $BuildDir
+    if (Test-Path "Makefile") {
+        Remove-Item "Makefile" -Force
+    }
+    $proc = Start-Process -FilePath "qmake" -ArgumentList "..\$ProFile" -Wait -PassThru -NoNewWindow
+    if ($proc.ExitCode -ne 0) {
+        Write-Host "qmake failed (exit=$($proc.ExitCode))" -ForegroundColor Red
+        exit 1
+    }
+    if (-not (Test-Path "Makefile")) {
+        Write-Host "qmake reported success but Makefile not found in build\" -ForegroundColor Red
+        exit 1
+    }
+}
+Write-Host "  OK" -ForegroundColor Green
+
+# ---------- Step 2: Incremental compile (no clean - let make decide) ----------
+Write-Host "[2/4] Compiling (mingw32-make in build\)..." -ForegroundColor Yellow
 Set-Location $BuildDir
-if (Test-Path "Makefile") {
-    Remove-Item "Makefile" -Force
-}
-$proc = Start-Process -FilePath "qmake" -ArgumentList "..\$ProFile" -Wait -PassThru -NoNewWindow
-if ($proc.ExitCode -ne 0) {
-    Write-Host "qmake failed (exit=$($proc.ExitCode))" -ForegroundColor Red
-    exit 1
-}
-if (-not (Test-Path "Makefile")) {
-    Write-Host "qmake reported success but Makefile not found in build\" -ForegroundColor Red
-    exit 1
-}
-Write-Host "  OK" -ForegroundColor Green
-
-# ---------- Step 2: Clean old artifacts ----------
-Write-Host "[2/4] Cleaning old build artifacts..." -ForegroundColor Yellow
-$null = Start-Process -FilePath "mingw32-make" -ArgumentList "clean" -Wait -PassThru -NoNewWindow
-Write-Host "  OK" -ForegroundColor Green
-
-# ---------- Step 3: Compile ----------
-Write-Host "[3/4] Compiling (mingw32-make in build\)..." -ForegroundColor Yellow
 $proc = Start-Process -FilePath "mingw32-make" -Wait -PassThru -NoNewWindow
 if ($proc.ExitCode -ne 0) {
     Write-Host "Build failed (exit=$($proc.ExitCode))" -ForegroundColor Red
@@ -94,8 +124,8 @@ if ($proc.ExitCode -ne 0) {
 }
 Write-Host "  OK" -ForegroundColor Green
 
-# ---------- Step 4: Copy DLLs to bin\ ----------
-Write-Host "[4/4] Copying dependency DLLs to bin\ ..." -ForegroundColor Yellow
+# ---------- Step 3: Copy DLLs to bin\ ----------
+Write-Host "[3/4] Copying dependency DLLs to bin\ ..." -ForegroundColor Yellow
 New-Item -ItemType Directory -Path $BinDir -Force | Out-Null
 
 $qtDlls = @("Qt5Core.dll", "Qt5Gui.dll", "Qt5Widgets.dll")
