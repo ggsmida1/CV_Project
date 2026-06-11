@@ -55,3 +55,7 @@ desktop.ini
 *.swp
 *.bak
 *.log
+
+# 导出的检测结果 CSV（每个人的检测数据不同）
+samples/results/*.csv
+!samples/results/.gitkeep

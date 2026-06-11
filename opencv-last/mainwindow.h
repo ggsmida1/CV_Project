@@ -120,7 +120,8 @@ private:
     QString m_testImagePath;           // 待测图片路径
     QString m_configFilePath;          // 配置文件路径
     QList<DetectionResult> m_resultList; // 检测结果列表
-    int m_resultCount;                 // 结果计数
+    int m_resultCount;                 // ROI 结果计数（内部用）
+    int m_imageResultCount;            // 图片检测次数（序号）
 
     // 辅助函数
     QImage mat2QImage(const cv::Mat &mat);
@@ -131,7 +132,7 @@ private:
     void displayResultImage();
     void updateROIList();
     void drawROIsOnTemplate();
-    void addResultToTable(const DetectionResult &result);
+    void addResultToTable(int imageId, const QList<DetectionResult> &roiResults);
 
     // 坐标映射：把 QLabel 控件坐标 -> 图像像素坐标（考虑缩放+居中偏移）
     // 返回 (-1,-1) 表示点击不在图像区域

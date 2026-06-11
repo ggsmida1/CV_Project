@@ -31,6 +31,7 @@ MainWindow::MainWindow(QWidget *parent)
     , m_currentROIIndex(-1)
     , m_isSelectingROI(false)
     , m_resultCount(0)
+    , m_imageResultCount(0)
 {
     // 隐藏系统标题栏（无边框），保留最小化/最大化/关闭能力
     setWindowFlags(Qt::Window | Qt::FramelessWindowHint);
@@ -421,23 +422,58 @@ void MainWindow::drawROIsOnTemplate()
     displayTemplateImage();
 }
 
-// 添加结果到表格
-void MainWindow::addResultToTable(const DetectionResult &result)
+// 添加一张图片的所有 ROI 检测结果到表格（一张图片 = 一条记录，跨 ROI 合并序号/图片名/时间）
+void MainWindow::addResultToTable(int imageId, const QList<DetectionResult> &roiResults)
 {
-    int row = ui->tableResults->rowCount();
-    ui->tableResults->insertRow(row);
+    if (roiResults.isEmpty()) return;
 
-    ui->tableResults->setItem(row, 0, new QTableWidgetItem(QString::number(result.id)));
-    ui->tableResults->setItem(row, 1, new QTableWidgetItem(result.imageName));
-    ui->tableResults->setItem(row, 2, new QTableWidgetItem(result.roiName));
+    int startRow = ui->tableResults->rowCount();
+    int rowCount = roiResults.size();
 
-    QTableWidgetItem *resultItem = new QTableWidgetItem(result.isDefective ? QString::fromUtf8(u8"残缺") : QString::fromUtf8(u8"正常"));
-    // 用 UserRole 存储状态：0 = 正常（绿）, 1 = 残缺（红）
-    // delegate 根据此值绘制绿/红背景色
-    resultItem->setData(Qt::UserRole, result.isDefective ? 1 : 0);
-    ui->tableResults->setItem(row, 3, resultItem);
+    // 一次性插入所需行数
+    for (int i = 0; i < rowCount; ++i) {
+        ui->tableResults->insertRow(startRow + i);
+    }
 
-    ui->tableResults->setItem(row, 4, new QTableWidgetItem(result.detectionTime));
+    // 列 0（序号）：跨所有 ROI 行合并
+    QTableWidgetItem *idItem = new QTableWidgetItem(QString::number(imageId));
+    idItem->setTextAlignment(Qt::AlignCenter);
+    ui->tableResults->setItem(startRow, 0, idItem);
+    if (rowCount > 1) {
+        ui->tableResults->setSpan(startRow, 0, rowCount, 1);
+    }
+
+    // 列 1（图片名称）：跨所有 ROI 行合并
+    QTableWidgetItem *nameItem = new QTableWidgetItem(roiResults.first().imageName);
+    nameItem->setTextAlignment(Qt::AlignCenter);
+    ui->tableResults->setItem(startRow, 1, nameItem);
+    if (rowCount > 1) {
+        ui->tableResults->setSpan(startRow, 1, rowCount, 1);
+    }
+
+    // 列 4（检测时间）：跨所有 ROI 行合并
+    QTableWidgetItem *timeItem = new QTableWidgetItem(roiResults.first().detectionTime);
+    timeItem->setTextAlignment(Qt::AlignCenter);
+    ui->tableResults->setItem(startRow, 4, timeItem);
+    if (rowCount > 1) {
+        ui->tableResults->setSpan(startRow, 4, rowCount, 1);
+    }
+
+    // 列 2（检测区域）和 列 3（检测结果）：每个 ROI 一行
+    for (int i = 0; i < rowCount; ++i) {
+        const DetectionResult &r = roiResults[i];
+
+        QTableWidgetItem *roiItem = new QTableWidgetItem(r.roiName);
+        roiItem->setTextAlignment(Qt::AlignCenter);
+        ui->tableResults->setItem(startRow + i, 2, roiItem);
+
+        QTableWidgetItem *resultItem = new QTableWidgetItem(r.isDefective
+            ? QString::fromUtf8(u8"残缺")
+            : QString::fromUtf8(u8"正常"));
+        resultItem->setTextAlignment(Qt::AlignCenter);
+        resultItem->setData(Qt::UserRole, r.isDefective ? 1 : 0);
+        ui->tableResults->setItem(startRow + i, 3, resultItem);
+    }
 }
 
 // ==================== 模板设计模块 ====================
@@ -819,6 +855,9 @@ void MainWindow::performDetection(const QString &imagePath)
     QString imageName = fileInfo.fileName();
     QString detectionTime = QDateTime::currentDateTime().toString("yyyy-MM-dd hh:mm:ss");
 
+    // 收集当前图片所有 ROI 的检测结果（一张图片 = 一条记录）
+    QList<DetectionResult> imageRoiResults;
+
     for (const ROIRect &roi : m_roiList) {
         // 粗略位置：matchPoint + roi.rect
         cv::Point roughCenter(matchPoint.x + roi.rect.x + roi.rect.width / 2,
@@ -909,7 +948,13 @@ void MainWindow::performDetection(const QString &imagePath)
         result.detectionTime = detectionTime;
 
         m_resultList.append(result);
-        addResultToTable(result);
+        imageRoiResults.append(result);
+    }
+
+    // 一张图片所有 ROI 检测完后，一次性添加到表格（合并序号/图片名/时间）
+    if (!imageRoiResults.isEmpty()) {
+        ++m_imageResultCount;
+        addResultToTable(m_imageResultCount, imageRoiResults);
     }
 
     displayResultImage();
@@ -1101,7 +1146,21 @@ void MainWindow::on_btnBatchDetection_clicked()
 // 结果模块槽函数
 void MainWindow::on_btnExportResults_clicked()
 {
-    QString path = QFileDialog::getSaveFileName(this, QString::fromUtf8(u8"导出结果"), "",
+    // 解析 samples/results 目录（与 templates/test_images 做法一致）
+    QDir appDir(QCoreApplication::applicationDirPath());
+    QString projectRoot = appDir.absolutePath();
+    if (!QDir(projectRoot + "/samples/results").exists()) {
+        appDir.cdUp();
+        projectRoot = appDir.absolutePath();
+    }
+    QString defaultDir = projectRoot + "/samples/results";
+
+    // 默认文件名：检测结果_yyyyMMdd_hhmmss.csv
+    QString defaultName = QString::fromUtf8(u8"检测结果_%1.csv")
+        .arg(QDateTime::currentDateTime().toString("yyyyMMdd_hhmmss"));
+    QString defaultPath = defaultDir + "/" + defaultName;
+
+    QString path = QFileDialog::getSaveFileName(this, QString::fromUtf8(u8"导出结果"), defaultPath,
                                                  QString::fromUtf8(u8"CSV文件 (*.csv)"));
     if (path.isEmpty()) {
         return;
@@ -1121,8 +1180,19 @@ void MainWindow::on_btnExportResults_clicked()
     out.setCodec("UTF-8");
     out << QString::fromUtf8(u8"序号,图片名称,检测区域,检测结果,残缺程度,检测时间\n");
 
+    // 按图片分组导出（序号 = 图片级，与表格合并展示一致）
+    // 用 "图片名称+检测时间" 作为分组 key
+    QMap<QString, int> imageIdMap;   // key -> 图片级序号
+    int nextImageId = 0;
+
     for (const DetectionResult &result : m_resultList) {
-        out << result.id << ","
+        QString key = result.imageName + "|" + result.detectionTime;
+        if (!imageIdMap.contains(key)) {
+            imageIdMap[key] = ++nextImageId;
+        }
+        int imageId = imageIdMap[key];
+
+        out << imageId << ","
             << result.imageName << ","
             << result.roiName << ","
             << (result.isDefective ? QString::fromUtf8(u8"残缺") : QString::fromUtf8(u8"正常")) << ","
@@ -1138,6 +1208,7 @@ void MainWindow::on_btnClearResults_clicked()
 {
     m_resultList.clear();
     m_resultCount = 0;
+    m_imageResultCount = 0;
     ui->tableResults->setRowCount(0);
     statusBar()->showMessage(QString::fromUtf8(u8"结果已清空"));
 }
