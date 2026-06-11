@@ -5,7 +5,7 @@
 
 namespace Detector {
 
-bool detectSkewAndCorrect(cv::Mat &image)
+double detectSkewAndCorrect(cv::Mat &image)
 {
     cv::Mat gray;
     if (image.channels() == 3) {
@@ -26,7 +26,7 @@ bool detectSkewAndCorrect(cv::Mat &image)
                      SkewConstants::HOUGH_THRESHOLD, minLineLength,
                      SkewConstants::HOUGH_MAX_GAP);
 
-    if (lines.empty()) return false;
+    if (lines.empty()) return 0.0;
 
     std::vector<double> angles;
     for (const auto &ln : lines) {
@@ -40,11 +40,11 @@ bool detectSkewAndCorrect(cv::Mat &image)
         }
     }
 
-    if (angles.empty()) return false;
+    if (angles.empty()) return 0.0;
 
     std::sort(angles.begin(), angles.end());
     double medianAngle = angles[angles.size() / 2];
-    if (std::abs(medianAngle) < SkewConstants::MIN_ANGLE) return false;
+    if (std::abs(medianAngle) < SkewConstants::MIN_ANGLE) return 0.0;
 
     cv::Point2f center(image.cols / 2.0f, image.rows / 2.0f);
     cv::Mat rotMat = cv::getRotationMatrix2D(center, medianAngle, 1.0);
@@ -60,7 +60,7 @@ bool detectSkewAndCorrect(cv::Mat &image)
     cv::warpAffine(image, rotated, rotMat, cv::Size(newW, newH),
                    cv::INTER_LINEAR, cv::BORDER_CONSTANT, cv::Scalar(255, 255, 255));
     image = rotated;
-    return true;
+    return medianAngle;
 }
 
 cv::Point templateMatch(const cv::Mat &testImage, const cv::Mat &templateImage)
@@ -73,11 +73,54 @@ cv::Point templateMatch(const cv::Mat &testImage, const cv::Mat &templateImage)
     return maxLoc;
 }
 
-cv::Rect calculateDetectionRegion(const cv::Point &matchPoint, const cv::Rect &templateROI)
+cv::Mat alignROI(const cv::Mat &testImage, const cv::Mat &roiTemplate,
+                 const cv::Point &roughMatchPoint, const cv::Rect &roiRect,
+                 cv::Rect &outAlignedRect)
 {
-    return cv::Rect(matchPoint.x + templateROI.x,
-                    matchPoint.y + templateROI.y,
-                    templateROI.width, templateROI.height);
+    cv::Point roughCenter(roughMatchPoint.x + roiRect.x + roiRect.width / 2,
+                          roughMatchPoint.y + roiRect.y + roiRect.height / 2);
+
+    int halfSearch = std::min(30, std::min(roiRect.width, roiRect.height) / 3);
+
+    cv::Rect searchRect(
+        std::max(0, roughCenter.x - roiRect.width / 2 - halfSearch),
+        std::max(0, roughCenter.y - roiRect.height / 2 - halfSearch),
+        roiRect.width + 2 * halfSearch,
+        roiRect.height + 2 * halfSearch
+    );
+    searchRect = searchRect & cv::Rect(0, 0, testImage.cols, testImage.rows);
+
+    cv::Point preciseOffset(0, 0);
+    if (searchRect.width >= roiRect.width && searchRect.height >= roiRect.height) {
+        cv::Mat testSearch = testImage(searchRect);
+        cv::Mat nccResult;
+        cv::matchTemplate(testSearch, roiTemplate, nccResult, cv::TM_CCOEFF_NORMED);
+        double minVal, maxVal;
+        cv::Point minLoc, maxLoc;
+        cv::minMaxLoc(nccResult, &minVal, &maxVal, &minLoc, &maxLoc);
+        preciseOffset = maxLoc;
+    }
+
+    cv::Rect testROI(
+        searchRect.x + preciseOffset.x,
+        searchRect.y + preciseOffset.y,
+        roiRect.width,
+        roiRect.height
+    );
+    testROI = testROI & cv::Rect(0, 0, testImage.cols, testImage.rows);
+
+    if (testROI.width != roiRect.width || testROI.height != roiRect.height) {
+        testROI = cv::Rect(
+            std::max(0, roughMatchPoint.x + roiRect.x),
+            std::max(0, roughMatchPoint.y + roiRect.y),
+            roiRect.width,
+            roiRect.height
+        );
+        testROI = testROI & cv::Rect(0, 0, testImage.cols, testImage.rows);
+    }
+
+    outAlignedRect = testROI;
+    return (testROI.area() > 0) ? testImage(testROI) : cv::Mat();
 }
 
 bool detectCharacterDefect(const cv::Mat &testRegion, const cv::Mat &templateRegion, double &defectScore)

@@ -21,9 +21,11 @@ struct DefectConstants {
     static constexpr int GAUSS_KERNEL = 3;
 };
 
-bool detectSkewAndCorrect(cv::Mat &image);
+double detectSkewAndCorrect(cv::Mat &image);
 cv::Point templateMatch(const cv::Mat &testImage, const cv::Mat &templateImage);
-cv::Rect calculateDetectionRegion(const cv::Point &matchPoint, const cv::Rect &templateROI);
+cv::Mat alignROI(const cv::Mat &testImage, const cv::Mat &roiTemplate,
+                 const cv::Point &matchPoint, const cv::Rect &roiRect,
+                 cv::Rect &outAlignedRect);
 bool detectCharacterDefect(const cv::Mat &testRegion, const cv::Mat &templateRegion, double &defectScore);
 
 }

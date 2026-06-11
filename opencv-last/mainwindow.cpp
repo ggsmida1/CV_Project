@@ -286,8 +286,9 @@ void MainWindow::performDetection(const QString &imagePath)
         return;
     }
 
-    if (Detector::detectSkewAndCorrect(testImage)) {
-        statusBar()->showMessage(QString::fromUtf8(u8"已进行倾斜矫正"));
+    double skewAngle = Detector::detectSkewAndCorrect(testImage);
+    if (skewAngle != 0.0) {
+        statusBar()->showMessage(QString::fromUtf8(u8"倾斜矫正完成: %1°").arg(skewAngle, 0, 'f', 2));
     }
 
     m_resultImage = testImage.clone();
@@ -304,51 +305,10 @@ void MainWindow::performDetection(const QString &imagePath)
     QList<DetectionResult> imageRoiResults;
 
     for (const ROIRect &roi : m_roiList) {
-        cv::Point roughCenter(matchPoint.x + roi.rect.x + roi.rect.width / 2,
-                              matchPoint.y + roi.rect.y + roi.rect.height / 2);
-
-        int halfSearch = std::min(30, std::min(roi.rect.width, roi.rect.height) / 3);
-
-        cv::Rect searchRect(
-            std::max(0, roughCenter.x - roi.rect.width / 2 - halfSearch),
-            std::max(0, roughCenter.y - roi.rect.height / 2 - halfSearch),
-            roi.rect.width + 2 * halfSearch,
-            roi.rect.height + 2 * halfSearch
-        );
-        searchRect = searchRect & cv::Rect(0, 0, testImage.cols, testImage.rows);
-
-        cv::Mat testSearch = testImage(searchRect);
-        cv::Point preciseOffset(0, 0);
-        if (searchRect.width >= roi.rect.width && searchRect.height >= roi.rect.height) {
-            cv::Mat nccResult;
-            cv::matchTemplate(testSearch, roi.templateImage, nccResult, cv::TM_CCOEFF_NORMED);
-            double minVal, maxVal;
-            cv::Point minLoc, maxLoc;
-            cv::minMaxLoc(nccResult, &minVal, &maxVal, &minLoc, &maxLoc);
-            preciseOffset = maxLoc;
-        }
-
-        cv::Rect testROI(
-            searchRect.x + preciseOffset.x,
-            searchRect.y + preciseOffset.y,
-            roi.rect.width,
-            roi.rect.height
-        );
-        testROI = testROI & cv::Rect(0, 0, testImage.cols, testImage.rows);
-
-        if (testROI.width != roi.rect.width || testROI.height != roi.rect.height) {
-            testROI = cv::Rect(
-                std::max(0, matchPoint.x + roi.rect.x),
-                std::max(0, matchPoint.y + roi.rect.y),
-                roi.rect.width,
-                roi.rect.height
-            );
-            testROI = testROI & cv::Rect(0, 0, testImage.cols, testImage.rows);
-        }
-
-        if (testROI.area() <= 0) continue;
-
-        cv::Mat testRegion = testImage(testROI);
+        cv::Rect testROI;
+        cv::Mat testRegion = Detector::alignROI(testImage, roi.templateImage,
+                                                 matchPoint, roi.rect, testROI);
+        if (testRegion.empty()) continue;
         double defectScore;
         bool isDefective = Detector::detectCharacterDefect(testRegion, roi.templateImage, defectScore);
 
@@ -493,29 +453,7 @@ void MainWindow::on_btnLoadTestImage_clicked()
 
 void MainWindow::on_btnBrowseConfig_clicked()
 {
-    QString defaultDir = ImageUtil::getSamplesDir("configs");
-    QString path = QFileDialog::getOpenFileName(this, QString::fromUtf8(u8"选择配置文件"),
-                                                defaultDir,
-                                                QString::fromUtf8(u8"JSON文件 (*.json)"));
-    if (path.isEmpty()) return;
-
-    ConfigManager::ConfigData data;
-    if (!ConfigManager::load(path, data)) {
-        QMessageBox::warning(this, QString::fromUtf8(u8"错误"),
-            QString::fromUtf8(u8"无法加载配置文件！\n路径：%1").arg(path));
-        return;
-    }
-
-    m_templateImage = data.templateImage;
-    m_templateImagePath = data.templatePath;
-    m_roiList = data.roiList;
-    m_currentROIIndex = -1;
-    updateROIList();
-    drawROIsOnTemplate();
-
-    m_configFilePath = path;
-    ui->txtConfigPath->setText(path);
-    statusBar()->showMessage(QString::fromUtf8(u8"已加载配置: %1").arg(path));
+    on_btnLoadConfig_clicked();
 }
 
 void MainWindow::on_btnStartDetection_clicked()
@@ -617,15 +555,23 @@ void MainWindow::mouseMoveEvent(QMouseEvent *event)
                                                     lbl->mapFromGlobal(event->globalPos()));
         if (imgPos.x() >= 0) m_roiEndPoint = imgPos;
 
-        cv::Mat display = m_templateDisplay.clone();
-        int x1 = qMin(m_roiStartPoint.x(), m_roiEndPoint.x());
-        int y1 = qMin(m_roiStartPoint.y(), m_roiEndPoint.y());
-        int x2 = qMax(m_roiStartPoint.x(), m_roiEndPoint.x());
-        int y2 = qMax(m_roiStartPoint.y(), m_roiEndPoint.y());
-        cv::rectangle(display, cv::Point(x1, y1), cv::Point(x2, y2),
-                      cv::Scalar(0, 0, 255), 2);
+        ImageUtil::displayImageOnLabel(lbl, m_templateDisplay, "");
+        const QPixmap *pixPtr = lbl->pixmap();
+        if (!pixPtr || pixPtr->isNull()) return;
+        QPixmap pix = *pixPtr;
 
-        ImageUtil::displayImageOnLabel(lbl, display, "");
+        double scale; int dummyOffX, dummyOffY;
+        ImageUtil::computeImageTransform(lbl, m_templateDisplay, scale, dummyOffX, dummyOffY);
+
+        QPainter painter(&pix);
+        painter.setPen(QPen(QColor(255, 0, 0), 2));
+        int sx1 = static_cast<int>(qMin(m_roiStartPoint.x(), m_roiEndPoint.x()) * scale);
+        int sy1 = static_cast<int>(qMin(m_roiStartPoint.y(), m_roiEndPoint.y()) * scale);
+        int sx2 = static_cast<int>(qMax(m_roiStartPoint.x(), m_roiEndPoint.x()) * scale);
+        int sy2 = static_cast<int>(qMax(m_roiStartPoint.y(), m_roiEndPoint.y()) * scale);
+        painter.drawRect(sx1, sy1, sx2 - sx1, sy2 - sy1);
+        painter.end();
+        lbl->setPixmap(pix);
     }
     QMainWindow::mouseMoveEvent(event);
 }

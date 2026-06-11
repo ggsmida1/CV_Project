@@ -5,8 +5,8 @@ greaterThan(QT_MAJOR_VERSION, 4): QT += widgets
 TARGET = CharacterDefectDetection
 TEMPLATE = app
 
-# 允许使用 C++11 特性
-CONFIG += c++11
+# 允许使用 C++17 特性
+CONFIG += c++17
 
 # MinGW UTF-8 支持：确保源文件和运行时字符串按 UTF-8 处理，中文字符串正常显示
 win32-g++ {
