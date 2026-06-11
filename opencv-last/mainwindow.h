@@ -87,7 +87,7 @@ private:
     void addROI(const cv::Rect &rect);
     void deleteROI(int index);
     void drawROIsOnTemplate();
-    void updateROIList();
+    void updateROIList(int preferredIndex = -1);
     void performDetection(const QString &imagePath);
 };
 

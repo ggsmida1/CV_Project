@@ -179,9 +179,9 @@ bool MainWindow::loadTemplateImage(const QString &path)
     return true;
 }
 
-void MainWindow::updateROIList()
+void MainWindow::updateROIList(int preferredIndex)
 {
-    int currentRow = ui->listROI->currentRow();
+    int currentRow = (preferredIndex >= 0) ? preferredIndex : ui->listROI->currentRow();
     ui->listROI->blockSignals(true);
     ui->listROI->clear();
     for (int i = 0; i < m_roiList.size(); ++i) {
@@ -238,7 +238,7 @@ void MainWindow::addROI(const cv::Rect &rect)
     roi.name = QString::fromUtf8(u8"区域%1").arg(roi.id);
     roi.templateImage = m_templateImage(validRect).clone();
     m_roiList.append(roi);
-    updateROIList();
+    updateROIList(m_roiList.size() - 1);
     drawROIsOnTemplate();
     statusBar()->showMessage(QString::fromUtf8(u8"已添加检测区域: %1").arg(roi.name));
 }
