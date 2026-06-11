@@ -17,11 +17,25 @@
 #include <QPainter>
 #include <QRect>
 #include <QPoint>
+#include <QStyledItemDelegate>
 #include <opencv2/opencv.hpp>
 
 QT_BEGIN_NAMESPACE
 namespace Ui { class MainWindow; }
 QT_END_NAMESPACE
+
+// 自定义 delegate：根据 item 的 Qt::UserRole 数据（检测结果值）来绘制绿/红背景
+// 这是绕过 QSS 覆盖 item 背景色的最可靠方式
+class ResultItemDelegate : public QStyledItemDelegate
+{
+    Q_OBJECT
+public:
+    explicit ResultItemDelegate(QObject *parent = nullptr)
+        : QStyledItemDelegate(parent) {}
+
+    void paint(QPainter *painter, const QStyleOptionViewItem &option,
+               const QModelIndex &index) const override;
+};
 
 // ROI区域结构体
 struct ROIRect {

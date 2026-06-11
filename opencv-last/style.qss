@@ -212,9 +212,10 @@ QListWidget::item:hover:!selected {
 QTableWidget {
     border: 1px solid #3d566e;
     border-radius: 3px;
-    background-color: #2c3e50;
+    background-color: #34495e;
     color: #ecf0f1;
-    gridline-color: #34495e;
+    gridline-color: #3d566e;
+    outline: 0;
 }
 
 QTableWidget::item {
@@ -224,10 +225,6 @@ QTableWidget::item {
 QTableWidget::item:selected {
     background-color: #f39c12;
     color: #2c3e50;
-}
-
-QTableWidget::item:hover {
-    background-color: #3d566e;
 }
 
 QHeaderView::section {

@@ -5,7 +5,22 @@
 #include <QTextStream>
 #include <QGuiApplication>
 #include <QScreen>
+#include <QStyle>
+#include <QApplication>
 #include <cmath>
+
+// ResultItemDelegate 实现：根据 item 的 UserRole 数据绘制绿/红背景
+// 仅用于第 3 列（检测结果列），0 = 正常（绿色）, 1 = 残缺（红色）
+void ResultItemDelegate::paint(QPainter *painter, const QStyleOptionViewItem &option,
+                               const QModelIndex &index) const
+{
+    int status = index.data(Qt::UserRole).toInt();
+    QColor bgColor = (status == 1) ? QColor("#c0392b") : QColor("#27ae60");
+    painter->fillRect(option.rect, bgColor);
+    painter->setPen(QColor("#ffffff"));
+    QTextOption textOpt(Qt::AlignCenter);
+    painter->drawText(option.rect, index.data(Qt::DisplayRole).toString(), textOpt);
+}
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
@@ -64,7 +79,14 @@ MainWindow::MainWindow(QWidget *parent)
     // 初始化状态栏
     statusBar()->showMessage("就绪");
 
-    // 初始化表格 - 让最后一列自动拉伸填满剩余空间，避免右侧出现空白
+    // 隐藏行号列（vertical header），避免与"序号"列重复
+    ui->tableResults->verticalHeader()->setVisible(false);
+
+    // 只把 delegate 安装到第 3 列（检测结果列），其余列保持默认样式
+    // （QSS 会覆盖 item->setBackground()，所以必须用 delegate 来保证颜色生效）
+    ui->tableResults->setItemDelegateForColumn(3, new ResultItemDelegate(ui->tableResults));
+
+    // 设置列宽
     ui->tableResults->setColumnWidth(0, 80);
     ui->tableResults->setColumnWidth(2, 200);
     ui->tableResults->setColumnWidth(3, 120);
@@ -75,6 +97,11 @@ MainWindow::MainWindow(QWidget *parent)
     ui->tableResults->horizontalHeader()->setSectionResizeMode(2, QHeaderView::Fixed);
     ui->tableResults->horizontalHeader()->setSectionResizeMode(3, QHeaderView::Fixed);
     ui->tableResults->horizontalHeader()->setSectionResizeMode(4, QHeaderView::Fixed);
+
+    // 设置表头为固定高度，避免不同系统默认值差异
+    ui->tableResults->horizontalHeader()->setFixedHeight(32);
+    // 设置默认行高，使表格视觉更协调
+    ui->tableResults->verticalHeader()->setDefaultSectionSize(32);
 
     // 启用鼠标追踪
     setMouseTracking(true);
@@ -399,15 +426,17 @@ void MainWindow::addResultToTable(const DetectionResult &result)
 {
     int row = ui->tableResults->rowCount();
     ui->tableResults->insertRow(row);
-    
+
     ui->tableResults->setItem(row, 0, new QTableWidgetItem(QString::number(result.id)));
     ui->tableResults->setItem(row, 1, new QTableWidgetItem(result.imageName));
     ui->tableResults->setItem(row, 2, new QTableWidgetItem(result.roiName));
-    
+
     QTableWidgetItem *resultItem = new QTableWidgetItem(result.isDefective ? "残缺" : "正常");
-    resultItem->setBackground(result.isDefective ? QBrush(Qt::red) : QBrush(Qt::green));
+    // 用 UserRole 存储状态：0 = 正常（绿）, 1 = 残缺（红）
+    // delegate 根据此值绘制绿/红背景色
+    resultItem->setData(Qt::UserRole, result.isDefective ? 1 : 0);
     ui->tableResults->setItem(row, 3, resultItem);
-    
+
     ui->tableResults->setItem(row, 4, new QTableWidgetItem(result.detectionTime));
 }
 
