@@ -43,28 +43,57 @@
 
 ### 1. 安装依赖
 
-- 安装 Qt Creator 和 Qt 库
-- 安装 OpenCV（MinGW 版本）
+- 安装 Qt (MinGW 版本，推荐 5.14.2 或更高)
+- 安装 OpenCV (MinGW 编译版本，推荐 4.10.0 或更高)
 
 ### 2. 配置 OpenCV 路径
 
-设置环境变量 `OPENCV_DIR` 指向 OpenCV 安装目录：
+设置环境变量 `OPENCV_DIR` 指向 OpenCV 安装目录，结构需包含 `include/` 和 `x64/mingw/lib/` 子目录：
 
 ```
 OPENCV_DIR = D:/your/opencv/install/path
 ```
 
-或在 `opencv-last.pro` 中修改默认路径：
+或在 `opencv-last/opencv-last.pro` 中修改默认路径。
 
-```qmake
-OPENCV_DIR = E:/software-e/opencv-4.10.0/build_mingw/install
+### 3. 编译步骤（两种方式二选一）
+
+#### 方式 A：一键脚本（推荐，无需 Qt Creator）
+
+```powershell
+cd opencv-last
+# 打开 build.ps1，修改顶部 CONFIG 区的 5 个路径为你本地 Qt / MinGW / OpenCV 路径
+.\build.ps1
 ```
 
-### 3. 编译步骤
+脚本会自动：
+1. 调用 `qmake` 生成 Makefile（中间产物在 `build/`）
+2. 调用 `mingw32-make` 编译
+3. 把 Qt / OpenCV 运行所需 DLL 和 `platforms/` 插件复制到 `bin/`
+4. 启动程序
 
-1. Qt Creator 打开 `opencv-last.pro`
+编译后目录结构：
+```
+opencv-last/
+├── build/                 # 编译中间产物（不提交）
+└── bin/                   # 可执行程序 + 依赖 DLL（不提交）
+    ├── CharacterDefectDetection.exe
+    ├── Qt5Core.dll / Qt5Gui.dll / Qt5Widgets.dll
+    ├── libopencv_world4100.dll
+    └── platforms/qwindows.dll
+```
+
+#### 方式 B：使用 Qt Creator
+
+1. Qt Creator 打开 `opencv-last/opencv-last.pro`
 2. 执行 qmake
 3. 构建项目
+
+### 4. 团队协作注意事项
+
+- `build/` 和 `bin/` 不会提交到 Git（已在 `opencv-last/.gitignore`）
+- `build.ps1` **会提交到仓库**作为模板。每位开发者首次使用时在本地编辑 `CONFIG` 区的 5 个路径即可（不要把自己的本地路径改动提交回共享仓库，除非是调整默认示例）
+- 如添加新的源文件，请在 `opencv-last.pro` 的 `SOURCES` / `HEADERS` 里同步更新
 
 ## 使用方法
 
@@ -114,9 +143,13 @@ opencv-last/
 ├── mainwindow.h          # 主窗口头文件
 ├── mainwindow.cpp        # 主窗口实现
 ├── mainwindow.ui         # UI界面文件
+├── resources.qrc         # Qt 资源文件（含样式）
+├── style.qss             # 界面样式（深色工业风）
 ├── opencv-last.pro       # Qt项目配置文件
+├── build.ps1             # 一键构建脚本（首次使用需编辑路径）
 ├── .gitignore            # Git忽略配置
-└── README.md             # 项目说明文档
+├── build/                # 编译中间产物（不提交）
+└── bin/                  # 可执行程序 + 依赖DLL（不提交）
 ```
 
 ## 作者
