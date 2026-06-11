@@ -86,7 +86,7 @@ MainWindow::MainWindow(QWidget *parent)
     ui->tableResults->horizontalHeader()->setSectionResizeMode(2, QHeaderView::Fixed);
     ui->tableResults->horizontalHeader()->setSectionResizeMode(3, QHeaderView::Fixed);
     ui->tableResults->horizontalHeader()->setSectionResizeMode(4, QHeaderView::Fixed);
-    ui->tableResults->horizontalHeader()->setFixedHeight(32);
+    ui->tableResults->horizontalHeader()->setFixedHeight(38);
     ui->tableResults->verticalHeader()->setDefaultSectionSize(32);
 
     setMouseTracking(true);
