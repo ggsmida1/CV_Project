@@ -72,6 +72,15 @@ Write-Host "  Character Defect Detection - Build Script"    -ForegroundColor Cya
 Write-Host "==============================================" -ForegroundColor Cyan
 Write-Host ""
 
+# ---------- Kill running instance so linker can overwrite exe ----------
+$running = Get-Process -Name ($ExeName -replace '\.exe$','') -ErrorAction SilentlyContinue
+if ($running) {
+    Write-Host "[pre] Found running $ExeName, terminating ..." -ForegroundColor Yellow
+    $running | Stop-Process -Force -ErrorAction SilentlyContinue
+    Start-Sleep -Seconds 1
+    Write-Host "  OK" -ForegroundColor Green
+}
+
 # ---------- Clean build if requested ----------
 if ($cleanBuild) {
     Write-Host "[pre] --clean: removing build\ and bin\ ..." -ForegroundColor Yellow

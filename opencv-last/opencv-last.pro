@@ -8,6 +8,11 @@ TEMPLATE = app
 # 允许使用 C++11 特性
 CONFIG += c++11
 
+# MinGW UTF-8 支持：确保源文件和运行时字符串按 UTF-8 处理，中文字符串正常显示
+win32-g++ {
+    QMAKE_CXXFLAGS += -finput-charset=UTF-8 -fexec-charset=UTF-8
+}
+
 # 构建输出目录
 DESTDIR = $$PWD/bin
 OBJECTS_DIR = $$PWD/build/obj

@@ -77,7 +77,7 @@ MainWindow::MainWindow(QWidget *parent)
     ui->btnClearResults->style()->polish(ui->btnClearResults);
 
     // 初始化状态栏
-    statusBar()->showMessage("就绪");
+    statusBar()->showMessage(QString::fromUtf8(u8"就绪"));
 
     // 隐藏行号列（vertical header），避免与"序号"列重复
     ui->tableResults->verticalHeader()->setVisible(false);
@@ -137,7 +137,7 @@ void MainWindow::on_btnMaximize_clicked()
             resize(1400, 900);
             setGeometry(100, 100, 1400, 900);
         }
-        ui->btnMaximize->setText("▢");
+        ui->btnMaximize->setText(QString::fromUtf8(u8"▢"));
         m_isMaximized = false;
     } else {
         // 最大化
@@ -165,7 +165,7 @@ void MainWindow::on_btnMaximize_clicked()
         resize(w, h);
         setGeometry(0, 0, w, h);
 
-        ui->btnMaximize->setText("❐");
+        ui->btnMaximize->setText(QString::fromUtf8(u8"❐"));
         m_isMaximized = true;
     }
 
@@ -315,7 +315,7 @@ QPoint MainWindow::labelToImagePos(QLabel *label, const cv::Mat &image, const QP
 void MainWindow::displayTemplateImage()
 {
     if (m_templateDisplay.empty()) {
-        ui->lblTemplateImage->setText("请加载模板图片");
+        ui->lblTemplateImage->setText(QString::fromUtf8(u8"请加载模板图片"));
         return;
     }
     
@@ -334,7 +334,7 @@ void MainWindow::displayTemplateImage()
 void MainWindow::displayTestImage()
 {
     if (m_testImage.empty()) {
-        ui->lblTestImage->setText("待测图片");
+        ui->lblTestImage->setText(QString::fromUtf8(u8"待测图片"));
         return;
     }
     
@@ -352,7 +352,7 @@ void MainWindow::displayTestImage()
 void MainWindow::displayResultImage()
 {
     if (m_resultImage.empty()) {
-        ui->lblResultImage->setText("检测结果");
+        ui->lblResultImage->setText(QString::fromUtf8(u8"检测结果"));
         return;
     }
     
@@ -394,7 +394,7 @@ void MainWindow::updateROIList()
         m_currentROIIndex = -1;
     }
 
-    ui->lblROIInfo->setText(QString("当前共 %1 个检测区域").arg(m_roiList.size()));
+    ui->lblROIInfo->setText(QString::fromUtf8(u8"当前共 %1 个检测区域").arg(m_roiList.size()));
 }
 
 // 在模板图像上绘制ROI
@@ -431,7 +431,7 @@ void MainWindow::addResultToTable(const DetectionResult &result)
     ui->tableResults->setItem(row, 1, new QTableWidgetItem(result.imageName));
     ui->tableResults->setItem(row, 2, new QTableWidgetItem(result.roiName));
 
-    QTableWidgetItem *resultItem = new QTableWidgetItem(result.isDefective ? "残缺" : "正常");
+    QTableWidgetItem *resultItem = new QTableWidgetItem(result.isDefective ? QString::fromUtf8(u8"残缺") : QString::fromUtf8(u8"正常"));
     // 用 UserRole 存储状态：0 = 正常（绿）, 1 = 残缺（红）
     // delegate 根据此值绘制绿/红背景色
     resultItem->setData(Qt::UserRole, result.isDefective ? 1 : 0);
@@ -447,7 +447,7 @@ bool MainWindow::loadTemplateImage(const QString &path)
 {
     m_templateImage = imreadSafe(path);
     if (m_templateImage.empty()) {
-        QMessageBox::warning(this, "错误", QString("无法加载模板图片！\n路径：%1\n\n提示：请确认文件格式为 PNG/JPG/BMP/TIF。").arg(path));
+        QMessageBox::warning(this, QString::fromUtf8(u8"错误"), QString::fromUtf8(u8"无法加载模板图片！\n路径：%1\n\n提示：请确认文件格式为 PNG/JPG/BMP/TIF。").arg(path));
         return false;
     }
     
@@ -457,7 +457,7 @@ bool MainWindow::loadTemplateImage(const QString &path)
     updateROIList();
     drawROIsOnTemplate();
     
-    statusBar()->showMessage(QString("已加载模板: %1").arg(path));
+    statusBar()->showMessage(QString::fromUtf8(u8"已加载模板: %1").arg(path));
     return true;
 }
 
@@ -465,13 +465,13 @@ bool MainWindow::loadTemplateImage(const QString &path)
 void MainWindow::addROI(const cv::Rect &rect)
 {
     if (m_templateImage.empty()) {
-        QMessageBox::warning(this, "提示", "请先加载模板图片！");
+        QMessageBox::warning(this, QString::fromUtf8(u8"提示"), QString::fromUtf8(u8"请先加载模板图片！"));
         return;
     }
     
     // 验证ROI是否有效
     if (rect.width < 10 || rect.height < 10) {
-        QMessageBox::warning(this, "提示", "检测区域太小，请重新选择！");
+        QMessageBox::warning(this, QString::fromUtf8(u8"提示"), QString::fromUtf8(u8"检测区域太小，请重新选择！"));
         return;
     }
     
@@ -481,14 +481,14 @@ void MainWindow::addROI(const cv::Rect &rect)
     ROIRect roi;
     roi.id = m_roiList.size() + 1;
     roi.rect = validRect;
-    roi.name = QString("区域%1").arg(roi.id);
+    roi.name = QString::fromUtf8(u8"区域%1").arg(roi.id);
     roi.templateImage = m_templateImage(validRect).clone();
     
     m_roiList.append(roi);
     updateROIList();
     drawROIsOnTemplate();
     
-    statusBar()->showMessage(QString("已添加检测区域: %1").arg(roi.name));
+    statusBar()->showMessage(QString::fromUtf8(u8"已添加检测区域: %1").arg(roi.name));
 }
 
 // 删除ROI
@@ -499,7 +499,7 @@ void MainWindow::deleteROI(int index)
         m_currentROIIndex = -1;
         updateROIList();
         drawROIsOnTemplate();
-        statusBar()->showMessage("已删除检测区域");
+        statusBar()->showMessage(QString::fromUtf8(u8"已删除检测区域"));
     }
 }
 
@@ -507,15 +507,15 @@ void MainWindow::deleteROI(int index)
 bool MainWindow::saveConfigFile(const QString &path)
 {
     if (m_templateImage.empty()) {
-        QMessageBox::warning(this, "提示", "请先加载模板图片！");
+        QMessageBox::warning(this, QString::fromUtf8(u8"提示"), QString::fromUtf8(u8"请先加载模板图片！"));
         return false;
     }
     
     if (m_roiList.isEmpty()) {
-        QMessageBox::warning(this, "提示", "请先添加检测区域！");
+        QMessageBox::warning(this, QString::fromUtf8(u8"提示"), QString::fromUtf8(u8"请先添加检测区域！"));
         return false;
     }
-    
+
     QJsonObject root;
 
     // 将模板路径存为相对路径（相对于 samples 目录），便于跨机器共享
@@ -526,7 +526,7 @@ bool MainWindow::saveConfigFile(const QString &path)
 
     root["templateWidth"] = m_templateImage.cols;
     root["templateHeight"] = m_templateImage.rows;
-    
+
     QJsonArray roiArray;
     for (const ROIRect &roi : m_roiList) {
         QJsonObject roiObj;
@@ -536,28 +536,28 @@ bool MainWindow::saveConfigFile(const QString &path)
         roiObj["y"] = roi.rect.y;
         roiObj["width"] = roi.rect.width;
         roiObj["height"] = roi.rect.height;
-        
+
         // 将模板图像保存为Base64
         std::vector<uchar> buf;
         cv::imencode(".png", roi.templateImage, buf);
         QByteArray base64 = QByteArray::fromRawData(reinterpret_cast<const char*>(buf.data()), buf.size()).toBase64();
         roiObj["templateImage"] = QString(base64);
-        
+
         roiArray.append(roiObj);
     }
     root["roiList"] = roiArray;
-    
+
     QJsonDocument doc(root);
     QFile file(path);
     if (!file.open(QIODevice::WriteOnly)) {
-        QMessageBox::warning(this, "错误", "无法保存配置文件！");
+        QMessageBox::warning(this, QString::fromUtf8(u8"错误"), QString::fromUtf8(u8"无法保存配置文件！"));
         return false;
     }
-    
+
     file.write(doc.toJson());
     file.close();
-    
-    statusBar()->showMessage(QString("配置已保存: %1").arg(path));
+
+    statusBar()->showMessage(QString::fromUtf8(u8"配置已保存: %1").arg(path));
     return true;
 }
 
@@ -566,20 +566,20 @@ bool MainWindow::loadConfigFile(const QString &path)
 {
     QFile file(path);
     if (!file.open(QIODevice::ReadOnly)) {
-        QMessageBox::warning(this, "错误", "无法加载配置文件！");
+        QMessageBox::warning(this, QString::fromUtf8(u8"错误"), QString::fromUtf8(u8"无法加载配置文件！"));
         return false;
     }
-    
+
     QByteArray data = file.readAll();
     file.close();
-    
+
     QJsonParseError error;
     QJsonDocument doc = QJsonDocument::fromJson(data, &error);
     if (error.error != QJsonParseError::NoError) {
-        QMessageBox::warning(this, "错误", "配置文件格式错误！");
+        QMessageBox::warning(this, QString::fromUtf8(u8"错误"), QString::fromUtf8(u8"配置文件格式错误！"));
         return false;
     }
-    
+
     QJsonObject root = doc.object();
 
     // 加载模板图片（路径是相对于 samples 目录的相对路径）
@@ -596,8 +596,8 @@ bool MainWindow::loadConfigFile(const QString &path)
     QString templateAbsolutePath = projectRoot + "/samples/" + templateRelativePath;
 
     if (!loadTemplateImage(templateAbsolutePath)) {
-        QMessageBox::warning(this, "错误",
-            QString("无法加载模板图片！\n路径：%1\n\n提示：请确认 templates 目录下存在该图片。")
+        QMessageBox::warning(this, QString::fromUtf8(u8"错误"),
+            QString::fromUtf8(u8"无法加载模板图片！\n路径：%1\n\n提示：请确认 templates 目录下存在该图片。")
             .arg(templateAbsolutePath));
         return false;
     }
@@ -629,7 +629,7 @@ bool MainWindow::loadConfigFile(const QString &path)
     
     m_configFilePath = path;
     ui->txtConfigPath->setText(path);
-    statusBar()->showMessage(QString("已加载配置: %1").arg(path));
+    statusBar()->showMessage(QString::fromUtf8(u8"已加载配置: %1").arg(path));
     return true;
 }
 
@@ -640,13 +640,13 @@ bool MainWindow::loadTestImage(const QString &path)
 {
     m_testImage = imreadSafe(path);
     if (m_testImage.empty()) {
-        QMessageBox::warning(this, "错误", QString("无法加载待测图片！\n路径：%1").arg(path));
+        QMessageBox::warning(this, QString::fromUtf8(u8"错误"), QString::fromUtf8(u8"无法加载待测图片！\n路径：%1").arg(path));
         return false;
     }
-    
+
     m_testImagePath = path;
     displayTestImage();
-    statusBar()->showMessage(QString("已加载待测图片: %1").arg(path));
+    statusBar()->showMessage(QString::fromUtf8(u8"已加载待测图片: %1").arg(path));
     return true;
 }
 
@@ -789,14 +789,14 @@ bool MainWindow::detectCharacterDefect(const cv::Mat &testRegion, const cv::Mat 
 void MainWindow::performDetection(const QString &imagePath)
 {
     if (m_roiList.isEmpty()) {
-        QMessageBox::warning(this, "提示", "请先加载配置文件或设置检测区域！");
+        QMessageBox::warning(this, QString::fromUtf8(u8"提示"), QString::fromUtf8(u8"请先加载配置文件或设置检测区域！"));
         return;
     }
 
     // 加载待测图片
     cv::Mat testImage = imreadSafe(imagePath);
     if (testImage.empty()) {
-        QMessageBox::warning(this, "错误", QString("无法加载待测图片！\n路径：%1").arg(imagePath));
+        QMessageBox::warning(this, QString::fromUtf8(u8"错误"), QString::fromUtf8(u8"无法加载待测图片！\n路径：%1").arg(imagePath));
         return;
     }
 
@@ -913,7 +913,7 @@ void MainWindow::performDetection(const QString &imagePath)
     }
 
     displayResultImage();
-    statusBar()->showMessage(QString("检测完成: %1").arg(imageName));
+    statusBar()->showMessage(QString::fromUtf8(u8"检测完成: %1").arg(imageName));
 }
 
 // ==================== 槽函数实现 ====================
@@ -930,9 +930,9 @@ void MainWindow::on_btnLoadTemplate_clicked()
     }
     QString defaultDir = projectRoot + "/samples/templates";
 
-    QString path = QFileDialog::getOpenFileName(this, "选择模板图片",
+    QString path = QFileDialog::getOpenFileName(this, QString::fromUtf8(u8"选择模板图片"),
                                                  defaultDir,
-                                                 "图片文件 (*.png *.jpg *.jpeg *.bmp *.tif)");
+                                                 QString::fromUtf8(u8"图片文件 (*.png *.jpg *.jpeg *.bmp *.tif)"));
     if (!path.isEmpty()) {
         loadTemplateImage(path);
     }
@@ -941,11 +941,11 @@ void MainWindow::on_btnLoadTemplate_clicked()
 void MainWindow::on_btnAddROI_clicked()
 {
     if (m_templateImage.empty()) {
-        QMessageBox::information(this, "提示", "请先加载模板图片，然后在图片上拖动鼠标选择检测区域。");
+        QMessageBox::information(this, QString::fromUtf8(u8"提示"), QString::fromUtf8(u8"请先加载模板图片，然后在图片上拖动鼠标选择检测区域。"));
         return;
     }
     m_isSelectingROI = true;
-    statusBar()->showMessage("请在模板图片上拖动鼠标选择检测区域...");
+    statusBar()->showMessage(QString::fromUtf8(u8"请在模板图片上拖动鼠标选择检测区域..."));
 }
 
 void MainWindow::on_btnDeleteROI_clicked()
@@ -954,7 +954,7 @@ void MainWindow::on_btnDeleteROI_clicked()
     if (currentRow >= 0) {
         deleteROI(currentRow);
     } else {
-        QMessageBox::information(this, "提示", "请先选择要删除的检测区域！");
+        QMessageBox::information(this, QString::fromUtf8(u8"提示"), QString::fromUtf8(u8"请先选择要删除的检测区域！"));
     }
 }
 
@@ -983,9 +983,9 @@ void MainWindow::on_btnSaveConfig_clicked()
 
     QString defaultPath = defaultDir + "/" + defaultName;
 
-    QString path = QFileDialog::getSaveFileName(this, "保存配置文件",
+    QString path = QFileDialog::getSaveFileName(this, QString::fromUtf8(u8"保存配置文件"),
                                                  defaultPath,
-                                                 "JSON文件 (*.json)");
+                                                 QString::fromUtf8(u8"JSON文件 (*.json)"));
     if (!path.isEmpty()) {
         if (!path.endsWith(".json")) {
             path += ".json";
@@ -1004,9 +1004,9 @@ void MainWindow::on_btnLoadConfig_clicked()
     }
     QString defaultDir = projectRoot + "/samples/configs";
 
-    QString path = QFileDialog::getOpenFileName(this, "选择配置文件",
+    QString path = QFileDialog::getOpenFileName(this, QString::fromUtf8(u8"选择配置文件"),
                                                  defaultDir,
-                                                 "JSON文件 (*.json)");
+                                                 QString::fromUtf8(u8"JSON文件 (*.json)"));
     if (!path.isEmpty()) {
         loadConfigFile(path);
     }
@@ -1029,9 +1029,9 @@ void MainWindow::on_btnLoadTestImage_clicked()
     }
     QString defaultDir = projectRoot + "/samples/test_images";
 
-    QString path = QFileDialog::getOpenFileName(this, "选择待测图片",
+    QString path = QFileDialog::getOpenFileName(this, QString::fromUtf8(u8"选择待测图片"),
                                                  defaultDir,
-                                                 "图片文件 (*.png *.jpg *.jpeg *.bmp *.tif)");
+                                                 QString::fromUtf8(u8"图片文件 (*.png *.jpg *.jpeg *.bmp *.tif)"));
     if (!path.isEmpty()) {
         loadTestImage(path);
     }
@@ -1047,9 +1047,9 @@ void MainWindow::on_btnBrowseConfig_clicked()
     }
     QString defaultDir = projectRoot + "/samples/configs";
 
-    QString path = QFileDialog::getOpenFileName(this, "选择配置文件",
+    QString path = QFileDialog::getOpenFileName(this, QString::fromUtf8(u8"选择配置文件"),
                                                  defaultDir,
-                                                 "JSON文件 (*.json)");
+                                                 QString::fromUtf8(u8"JSON文件 (*.json)"));
     if (!path.isEmpty()) {
         loadConfigFile(path);
     }
@@ -1058,21 +1058,21 @@ void MainWindow::on_btnBrowseConfig_clicked()
 void MainWindow::on_btnStartDetection_clicked()
 {
     if (m_testImage.empty()) {
-        QMessageBox::warning(this, "提示", "请先加载待测图片！");
+        QMessageBox::warning(this, QString::fromUtf8(u8"提示"), QString::fromUtf8(u8"请先加载待测图片！"));
         return;
     }
     if (m_roiList.isEmpty()) {
-        QMessageBox::warning(this, "提示", "请先加载配置文件！");
+        QMessageBox::warning(this, QString::fromUtf8(u8"提示"), QString::fromUtf8(u8"请先加载配置文件！"));
         return;
     }
-    
+
     performDetection(m_testImagePath);
 }
 
 void MainWindow::on_btnBatchDetection_clicked()
 {
     if (m_roiList.isEmpty()) {
-        QMessageBox::warning(this, "提示", "请先加载配置文件！");
+        QMessageBox::warning(this, QString::fromUtf8(u8"提示"), QString::fromUtf8(u8"请先加载配置文件！"));
         return;
     }
 
@@ -1083,55 +1083,55 @@ void MainWindow::on_btnBatchDetection_clicked()
         projectRoot = appDir.absolutePath();
     }
     QString defaultDir = projectRoot + "/samples/test_images";
-    
-    QStringList paths = QFileDialog::getOpenFileNames(this, "选择待测图片",
+
+    QStringList paths = QFileDialog::getOpenFileNames(this, QString::fromUtf8(u8"选择待测图片"),
                                                       defaultDir,
-                                                      "图片文件 (*.png *.jpg *.jpeg *.bmp *.tif)");
+                                                      QString::fromUtf8(u8"图片文件 (*.png *.jpg *.jpeg *.bmp *.tif)"));
     if (paths.isEmpty()) {
         return;
     }
-    
+
     for (const QString &path : paths) {
         performDetection(path);
     }
-    
-    QMessageBox::information(this, "完成", QString("批量检测完成，共检测 %1 张图片。").arg(paths.size()));
+
+    QMessageBox::information(this, QString::fromUtf8(u8"完成"), QString::fromUtf8(u8"批量检测完成，共检测 %1 张图片。").arg(paths.size()));
 }
 
 // 结果模块槽函数
 void MainWindow::on_btnExportResults_clicked()
 {
-    QString path = QFileDialog::getSaveFileName(this, "导出结果", "", 
-                                                 "CSV文件 (*.csv)");
+    QString path = QFileDialog::getSaveFileName(this, QString::fromUtf8(u8"导出结果"), "",
+                                                 QString::fromUtf8(u8"CSV文件 (*.csv)"));
     if (path.isEmpty()) {
         return;
     }
-    
+
     if (!path.endsWith(".csv")) {
         path += ".csv";
     }
-    
+
     QFile file(path);
     if (!file.open(QIODevice::WriteOnly | QIODevice::Text)) {
-        QMessageBox::warning(this, "错误", "无法创建导出文件！");
+        QMessageBox::warning(this, QString::fromUtf8(u8"错误"), QString::fromUtf8(u8"无法创建导出文件！"));
         return;
     }
-    
+
     QTextStream out(&file);
     out.setCodec("UTF-8");
-    out << "序号,图片名称,检测区域,检测结果,残缺程度,检测时间\n";
-    
+    out << QString::fromUtf8(u8"序号,图片名称,检测区域,检测结果,残缺程度,检测时间\n");
+
     for (const DetectionResult &result : m_resultList) {
         out << result.id << ","
             << result.imageName << ","
             << result.roiName << ","
-            << (result.isDefective ? "残缺" : "正常") << ","
+            << (result.isDefective ? QString::fromUtf8(u8"残缺") : QString::fromUtf8(u8"正常")) << ","
             << QString::number(result.defectScore * 100, 'f', 2) << "%,"
             << result.detectionTime << "\n";
     }
-    
+
     file.close();
-    QMessageBox::information(this, "完成", QString("结果已导出到: %1").arg(path));
+    QMessageBox::information(this, QString::fromUtf8(u8"完成"), QString::fromUtf8(u8"结果已导出到: %1").arg(path));
 }
 
 void MainWindow::on_btnClearResults_clicked()
@@ -1139,7 +1139,7 @@ void MainWindow::on_btnClearResults_clicked()
     m_resultList.clear();
     m_resultCount = 0;
     ui->tableResults->setRowCount(0);
-    statusBar()->showMessage("结果已清空");
+    statusBar()->showMessage(QString::fromUtf8(u8"结果已清空"));
 }
 
 // ==================== 鼠标事件处理 ====================

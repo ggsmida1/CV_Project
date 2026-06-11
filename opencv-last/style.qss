@@ -393,3 +393,33 @@ QLabel[infoLabel="true"] {
     padding: 8px;
     color: #bdc3c7;
 }
+
+/* ===== 对话框样式（避免被全局 QWidget/QLabel 浅色文字污染） ===== */
+/* QMessageBox 使用系统原生主题（浅色背景 + 深色文字），与标题栏一致 */
+QMessageBox {
+    background-color: #ffffff;
+}
+QMessageBox QLabel {
+    color: #2c3e50;
+    background-color: transparent;
+    font-size: 13px;
+    font-family: "Microsoft YaHei", "Segoe UI", sans-serif;
+}
+QMessageBox QPushButton {
+    background-color: #ffffff;
+    color: #2c3e50;
+    border: 1px solid #bdc3c7;
+    padding: 6px 20px;
+    border-radius: 3px;
+    min-width: 80px;
+    min-height: 16px;
+    font-size: 13px;
+}
+QMessageBox QPushButton:hover {
+    background-color: #ecf0f1;
+    border-color: #3498db;
+    color: #2980b9;
+}
+QMessageBox QPushButton:pressed {
+    background-color: #d5dbdb;
+}
