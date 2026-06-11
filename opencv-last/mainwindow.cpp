@@ -8,6 +8,7 @@
 #include <QStyle>
 #include <QApplication>
 #include <cmath>
+#include <algorithm>
 
 // ResultItemDelegate 实现：根据 item 的 UserRole 数据绘制绿/红背景
 // 仅用于第 3 列（检测结果列），0 = 正常（绿色）, 1 = 残缺（红色）
@@ -689,59 +690,75 @@ bool MainWindow::loadTestImage(const QString &path)
 // 检测倾斜并矫正
 bool MainWindow::detectSkewAndCorrect(cv::Mat &image)
 {
-    // 转换为灰度图
+    // 转换为灰度并做轻度模糊
     cv::Mat gray;
     if (image.channels() == 3) {
         cv::cvtColor(image, gray, cv::COLOR_BGR2GRAY);
     } else {
         gray = image.clone();
     }
+    cv::Mat blurred;
+    cv::GaussianBlur(gray, blurred, cv::Size(5, 5), 0);
 
-    // 二值化
-    cv::Mat binary;
-    cv::threshold(gray, binary, 0, 255, cv::THRESH_BINARY_INV | cv::THRESH_OTSU);
+    // 使用 Canny 提取边缘，比直接二值化更稳健
+    cv::Mat edges;
+    cv::Canny(blurred, edges, 50, 150);
 
-    // 使用霍夫变换检测直线（更严格的参数，避免虚假倾斜）
+    // HoughLinesP 检测直线
     std::vector<cv::Vec4i> lines;
-    int minLineLength = std::max(150, image.cols / 8);  // 线至少占图宽的1/8
-    cv::HoughLinesP(binary, lines, 1, CV_PI / 180, 200, minLineLength, 20);
+    int minLineLength = std::max(100, image.cols / 8);
+    cv::HoughLinesP(edges, lines, 1, CV_PI / 180, 100, minLineLength, 20);
 
     if (lines.empty()) {
-        return false;  // 未检测到倾斜
+        return false; // 未检测到直线，跳过矫正
     }
 
-    // 计算平均角度（只考虑接近水平的线，且多条线角度要一致）
-    double angle = 0;
-    int count = 0;
+    // 计算角度中位数（只考虑接近水平的线）
     std::vector<double> angles;
-    for (const auto &line : lines) {
-        double dx = line[2] - line[0];
-        double dy = line[3] - line[1];
-        double lineAngle = atan2(dy, dx) * 180 / CV_PI;
-
-        // 只考虑接近水平的线（倾斜角度小于45度）
-        if (fabs(lineAngle) < 45) {
-            angles.push_back(lineAngle);
-            angle += lineAngle;
-            count++;
+    for (const auto &ln : lines) {
+        double dx = ln[2] - ln[0];
+        double dy = ln[3] - ln[1];
+        double a = atan2(dy, dx) * 180.0 / CV_PI; // -180 ~ 180
+        // 规范到 [-90,90]
+        if (a > 90) a -= 180;
+        if (a <= -90) a += 180;
+        if (std::abs(a) < 45.0) {
+            angles.push_back(a);
         }
     }
 
-    if (count < 3) {  // 至少检测到3条线才认为是真实倾斜
+    if (angles.empty()) {
         return false;
     }
 
-    angle /= count;
+    std::sort(angles.begin(), angles.end());
+    double medianAngle = angles[angles.size() / 2];
 
-    // 只有倾斜角度 >=3 度才矫正（避免拍摄抖动导致的虚假旋转）
-    if (fabs(angle) < 3.0) {
+    // 只有足够明显的倾斜才矫正（阈值可调）
+    if (std::abs(medianAngle) < 1.0) {
         return false;
     }
 
-    // 旋转矫正
-    cv::Point2f center(image.cols / 2.0, image.rows / 2.0);
-    cv::Mat rotMat = cv::getRotationMatrix2D(center, angle, 1.0);
-    cv::warpAffine(image, image, rotMat, image.size(), cv::INTER_LINEAR, cv::BORDER_CONSTANT, cv::Scalar(255, 255, 255));
+    // 在状态栏显示检测到的角度，便于调试
+    statusBar()->showMessage(QString::fromUtf8(u8"检测到倾斜角: %1 度").arg(medianAngle, 0, 'f', 2));
+
+    // 旋转纠正：对于图像中线条的角度定义（在图像坐标系下，正值表示线从左向右向下）
+    // 要把文字“正过来”，需要按正向角度旋转（逆时针），因此直接使用 medianAngle
+    cv::Point2f center(image.cols / 2.0f, image.rows / 2.0f);
+    double rotAngle = medianAngle; // 正值表示顺时针倾斜，需要逆时针旋转（OpenCV 正角为逆时针）
+    cv::Mat rotMat = cv::getRotationMatrix2D(center, rotAngle, 1.0);
+
+    // 计算新画布避免裁剪
+    double absCos = std::abs(rotMat.at<double>(0, 0));
+    double absSin = std::abs(rotMat.at<double>(0, 1));
+    int newW = static_cast<int>(image.rows * absSin + image.cols * absCos);
+    int newH = static_cast<int>(image.rows * absCos + image.cols * absSin);
+    rotMat.at<double>(0, 2) += (newW / 2.0) - center.x;
+    rotMat.at<double>(1, 2) += (newH / 2.0) - center.y;
+
+    cv::Mat rotated;
+    cv::warpAffine(image, rotated, rotMat, cv::Size(newW, newH), cv::INTER_LINEAR, cv::BORDER_CONSTANT, cv::Scalar(255,255,255));
+    image = rotated;
 
     return true;
 }
