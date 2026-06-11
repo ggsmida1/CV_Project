@@ -247,6 +247,21 @@ QTableCornerButton::section {
     border: none;
 }
 
+/* ===== 检测结果摘要 ===== */
+#groupBox_summary {
+    max-height: 140px;
+}
+
+#lblDetectionSummary {
+    background-color: #1a252f;
+    border: 1px solid #3d566e;
+    border-radius: 4px;
+    padding: 8px;
+    color: #ecf0f1;
+    font-family: "Consolas", "Courier New", monospace;
+    font-size: 12px;
+}
+
 /* ===== 标签样式 ===== */
 QLabel {
     color: #ecf0f1;

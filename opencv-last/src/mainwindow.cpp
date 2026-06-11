@@ -359,6 +359,19 @@ void MainWindow::performDetection(const QString &imagePath)
     ImageUtil::displayImageOnLabel(ui->lblResultImage, m_resultImage,
                                    QStringLiteral("检测结果"));
     statusBar()->showMessage(QStringLiteral("检测完成: %1").arg(imageName));
+
+    // 更新检测结果摘要
+    QStringList lines;
+        lines << QStringLiteral("- %1").arg(imageName);
+    for (const DetectionResult &r : imageRoiResults) {
+        QString status = r.isDefective
+            ? QStringLiteral("残缺 (%1%)").arg(r.defectScore * 100, 0, 'f', 1)
+            : QStringLiteral("正常 (%1%)").arg((1.0 - r.defectScore) * 100, 0, 'f', 1);
+        lines << QStringLiteral("  %1 → %2").arg(r.roiName, -8).arg(status);
+    }
+    QString prev = ui->lblDetectionSummary->text();
+    if (prev == QStringLiteral("尚未检测")) prev.clear();
+    ui->lblDetectionSummary->setText(prev + lines.join(QStringLiteral("\n")) + QStringLiteral("\n"));
 }
 
 // ==================== 槽函数 ====================
@@ -483,6 +496,7 @@ void MainWindow::on_btnStartDetection_clicked()
         QMessageBox::warning(this, QStringLiteral("提示"), QStringLiteral("请先加载配置文件！"));
         return;
     }
+    ui->lblDetectionSummary->setText(QString());
     performDetection(m_testImagePath);
 }
 
@@ -499,6 +513,7 @@ void MainWindow::on_btnBatchDetection_clicked()
                                                       QStringLiteral("图片文件 (*.png *.jpg *.jpeg *.bmp *.tif)"));
     if (paths.isEmpty()) return;
 
+    ui->lblDetectionSummary->setText(QString());
     for (const QString &path : paths) {
         performDetection(path);
     }
