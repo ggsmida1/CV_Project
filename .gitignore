@@ -1,0 +1,59 @@
+# IDE 和编辑器配置（本地环境特定，不提交）
+.vscode/
+.idea/
+*.suo
+*.sln
+*.vcxproj*
+
+# Qt Creator 用户配置
+*.pro.user
+*.pro.user.*
+
+# qmake 生成的文件
+opencv-last/.qmake.stash
+opencv-last/Makefile
+opencv-last/Makefile.*
+opencv-last/*.Debug
+opencv-last/*.Release
+
+# 构建输出目录
+opencv-last/bin/
+opencv-last/build/
+opencv-last/debug/
+opencv-last/release/
+
+# 编译中间文件
+*.o
+*.obj
+moc_*.cpp
+moc_*.h
+qrc_*.cpp
+ui_*.h
+*.res
+
+# 可执行文件和库文件
+*.exe
+*.dll
+*.lib
+*.a
+*.so
+*.dylib
+
+# 导出的检测结果
+opencv-last/samples/results/*.csv
+
+# 操作系统文件
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# 临时文件
+*~
+*.swp
+*.bak
+*.log
+
+# Word 临时文件（写报告时自动生成）
+~$*.docx
+~$*.doc
+~$*.pptx
