@@ -40,6 +40,28 @@ bool save(const QString &path, const cv::Mat &templateImage,
     root["templateWidth"] = templateImage.cols;
     root["templateHeight"] = templateImage.rows;
 
+    // 将模板图像本身也 base64 编码嵌入 JSON，使配置文件完全自包含
+    // 这样即使 samples/templates/ 下找不到原始图片，也能从 JSON 中还原
+    std::vector<uchar> tplBuf;
+    cv::imencode(".jpg", templateImage, tplBuf);
+    QByteArray tplBase64 = QByteArray::fromRawData(
+        reinterpret_cast<const char *>(tplBuf.data()), tplBuf.size()).toBase64();
+    root["templateImage"] = QString(tplBase64);
+
+    // 同时把模板图片复制到 samples/templates/ 目录（便于调试和与旧版本兼容）
+    QDir appDir(QCoreApplication::applicationDirPath());
+    QString projectRoot = appDir.absolutePath();
+    if (!QDir(projectRoot + "/samples").exists()) {
+        appDir.cdUp();
+        projectRoot = appDir.absolutePath();
+    }
+    QString tplDir = projectRoot + "/samples/templates";
+    QDir().mkpath(tplDir);
+    QString tplDst = tplDir + "/" + templateInfo.fileName();
+    if (!QFile::exists(tplDst) && !templateImagePath.isEmpty()) {
+        QFile::copy(templateImagePath, tplDst);
+    }
+
     // --- 步骤3: 遍历 ROI 列表，将每个 ROI 的信息和子图像写入 JSON
     QJsonArray roiArray;
     for (const ROIRect &roi : roiList) {
@@ -95,27 +117,73 @@ bool load(const QString &path, ConfigData &outData)
 
     QJsonObject root = doc.object();
 
-    // --- 步骤3: 还原模板图像
-    // 获取模板相对路径（如 "templates/身份证背部.jpg"）
-    QString templateRelativePath = root["templatePath"].toString();
+    // --- 步骤3: 还原模板图像（优先从 JSON 内嵌的 base64 数据还原，退而从外部文件读取，
+    //          最后尝试从 ROI 子图像合成。三重保障确保不会因图片丢失而加载失败。）
+    cv::Mat templateImg;
+    QString templateAbsolutePath;
 
-    // 从应用目录向上查找 samples 目录
-    // （在 IDE 运行时 appDir 为构建目录，而 samples 在项目根目录）
-    QDir appDir(QCoreApplication::applicationDirPath());
-    QString projectRoot = appDir.absolutePath();
-    if (!QDir(projectRoot + "/samples").exists()) {
-        appDir.cdUp();
-        projectRoot = appDir.absolutePath();
+    // 方式1: 新格式——JSON 中已经把模板图用 base64 编码直接嵌入了
+    if (root.contains("templateImage") && !root["templateImage"].toString().isEmpty()) {
+        QByteArray tplBase64 = root["templateImage"].toString().toLatin1();
+        QByteArray tplData = QByteArray::fromBase64(tplBase64);
+        std::vector<uchar> tplBuf(tplData.begin(), tplData.end());
+        templateImg = cv::imdecode(tplBuf, cv::IMREAD_COLOR);
+        if (!templateImg.empty()) {
+            outData.templateImage = templateImg;
+            outData.templatePath = root["templatePath"].toString();
+        }
     }
-    // 拼出模板图像的绝对路径
-    QString templateAbsolutePath = projectRoot + "/samples/" + templateRelativePath;
 
-    // 使用 imreadSafe 读取（支持中文路径）
-    cv::Mat templateImg = ImageUtil::imreadSafe(templateAbsolutePath);
+    // 方式2: 旧格式——从 templatePath 指定的外部路径加载（向后兼容）
+    if (templateImg.empty()) {
+        QString templateRelativePath = root["templatePath"].toString();
+
+        QDir appDir(QCoreApplication::applicationDirPath());
+        QString projectRoot = appDir.absolutePath();
+        if (!QDir(projectRoot + "/samples").exists()) {
+            appDir.cdUp();
+            projectRoot = appDir.absolutePath();
+        }
+        templateAbsolutePath = projectRoot + "/samples/" + templateRelativePath;
+
+        templateImg = ImageUtil::imreadSafe(templateAbsolutePath);
+        if (!templateImg.empty()) {
+            outData.templateImage = templateImg;
+            outData.templatePath = templateAbsolutePath;
+        }
+    }
+
+    // 方式3: 兜底——从 JSON 中已有的 ROI 子图像合成一个简易模板图
+    // 当模板图彻底丢失时，用各 ROI 子图在其坐标位置合成一个最小可用图
+    if (templateImg.empty()) {
+        int tplW = root["templateWidth"].toInt();
+        int tplH = root["templateHeight"].toInt();
+        if (tplW > 0 && tplH > 0) {
+            templateImg = cv::Mat(tplH, tplW, CV_8UC3, cv::Scalar(200, 200, 200));
+            QJsonArray roiArray2 = root["roiList"].toArray();
+            for (const QJsonValue &v : roiArray2) {
+                QJsonObject obj = v.toObject();
+                int x = obj["x"].toInt(), y = obj["y"].toInt();
+                int w = obj["width"].toInt(), h = obj["height"].toInt();
+                QByteArray subBase64 = obj["templateImage"].toString().toLatin1();
+                QByteArray subData = QByteArray::fromBase64(subBase64);
+                std::vector<uchar> subBuf(subData.begin(), subData.end());
+                cv::Mat subImg = cv::imdecode(subBuf, cv::IMREAD_COLOR);
+                if (!subImg.empty() && x >= 0 && y >= 0 &&
+                    x + w <= tplW && y + h <= tplH) {
+                    cv::Mat dstRoi = templateImg(cv::Rect(x, y, w, h));
+                    cv::resize(subImg, dstRoi, dstRoi.size());
+                }
+            }
+            if (!templateImg.empty()) {
+                outData.templateImage = templateImg;
+                outData.templatePath = root["templatePath"].toString();
+            }
+        }
+    }
+
+    // 三种方式都失败才返回 false
     if (templateImg.empty()) return false;
-
-    outData.templateImage = templateImg;
-    outData.templatePath = templateAbsolutePath;
 
     // --- 步骤4: 遍历 ROI 数组，还原每个 ROI
     QJsonArray roiArray = root["roiList"].toArray();
